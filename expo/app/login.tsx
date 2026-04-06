@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
-  KeyboardAvoidingView, Platform, Animated,
+  KeyboardAvoidingView, Platform, Animated, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Lock, User, ParkingCircle } from 'lucide-react-native';
@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
-  const { users, logLogin } = useParking();
+  const { users, logLogin, isLoaded, syncStatus } = useParking();
   const colors = useColors();
   const [loginStr, setLoginStr] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +36,11 @@ export default function LoginScreen() {
       Alert.alert('Ошибка', 'Введите логин и пароль');
       return;
     }
+    if (!isLoaded) {
+      Alert.alert('Подождите', 'Данные ещё загружаются, попробуйте через пару секунд');
+      return;
+    }
+    console.log('[Login] Attempting login, users count:', users.length, 'syncStatus:', syncStatus);
     setLoading(true);
     try {
       const result = await login(loginStr.trim(), password, users);
@@ -52,7 +57,7 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loginStr, password, login, users, logLogin, router, shake]);
+  }, [loginStr, password, login, users, logLogin, router, shake, isLoaded, syncStatus]);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -75,8 +80,15 @@ export default function LoginScreen() {
             <Lock size={18} color={colors.textTertiary} />
             <TextInput style={styles.input} placeholder="Пароль" placeholderTextColor={colors.textTertiary} value={password} onChangeText={setPassword} secureTextEntry />
           </View>
-          <TouchableOpacity style={[styles.loginBtn, loading && styles.loginBtnDisabled]} onPress={handleLogin} disabled={loading} activeOpacity={0.8}>
-            <Text style={styles.loginBtnText}>{loading ? 'Вход...' : 'Войти'}</Text>
+          <TouchableOpacity style={[styles.loginBtn, (loading || !isLoaded) && styles.loginBtnDisabled]} onPress={handleLogin} disabled={loading || !isLoaded} activeOpacity={0.8}>
+            {!isLoaded ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" color={colors.white} />
+                <Text style={[styles.loginBtnText, { marginLeft: 8 }]}>Загрузка данных...</Text>
+              </View>
+            ) : (
+              <Text style={styles.loginBtnText}>{loading ? 'Вход...' : 'Войти'}</Text>
+            )}
           </TouchableOpacity>
         </Animated.View>
         <Text style={styles.hint}>По умолчанию: admin / admin</Text>
@@ -98,5 +110,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   loginBtn: { backgroundColor: colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
   loginBtnDisabled: { opacity: 0.6 },
   loginBtnText: { fontSize: 16, fontWeight: '700' as const, color: colors.white },
+  loadingRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const },
   hint: { fontSize: 12, color: colors.textTertiary, marginTop: 32 },
 });
