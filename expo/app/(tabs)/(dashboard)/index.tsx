@@ -35,6 +35,7 @@ export default function DashboardScreen() {
     getCurrentViolationMonth, getTodayCleaningShift,
     activeClients, activeCars,
     transactions, expenses, withdrawals,
+    syncStatus,
   } = useParking();
   const colors = useColors();
 
@@ -42,8 +43,7 @@ export default function DashboardScreen() {
   const [showChecklist, setShowChecklist] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
-  const [lastSyncAgo, setLastSyncAgo] = useState(0);
+
 
   const fadeAnimsRef = useRef([0, 1, 2, 3].map(() => new Animated.Value(0)));
   const slideAnimsRef = useRef([0, 1, 2, 3].map(() => new Animated.Value(20)));
@@ -121,12 +121,7 @@ export default function DashboardScreen() {
     }
   }, [currentShift, shiftProgressAnim]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastSyncAgo(prev => prev + 10);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const totalCashData = useMemo(() => {
     if (!currentShift) return null;
@@ -291,18 +286,15 @@ export default function DashboardScreen() {
           <Text style={styles.greeting} numberOfLines={1}>{currentUser?.name ?? 'Добро пожаловать'}</Text>
           <Text style={styles.role}>{isAdmin ? 'Администратор' : 'Менеджер'}</Text>
         </View>
-        <TouchableOpacity
-          onPress={() => { setSyncStatus('syncing'); setLastSyncAgo(0); setTimeout(() => setSyncStatus('synced'), 1000); }}
-          style={styles.syncBadge}
-          activeOpacity={0.7}
-        >
-          {syncStatus === 'synced' && <CheckCircle size={14} color={colors.success} />}
-          {syncStatus === 'syncing' && <RefreshCw size={14} color={colors.warning} />}
-          {syncStatus === 'offline' && <AlertCircle size={14} color={colors.danger} />}
-          <Text style={[styles.syncText, syncStatus === 'synced' && { color: colors.success }, syncStatus === 'syncing' && { color: colors.warning }, syncStatus === 'offline' && { color: colors.danger }]} numberOfLines={1}>
-            {syncStatus === 'synced' ? (lastSyncAgo < 10 ? 'Синхр.' : `${lastSyncAgo}с`) : syncStatus === 'syncing' ? 'Синх...' : 'Оффлайн'}
+        <View style={styles.syncBadge}>
+          {syncStatus === 'connected' && <CheckCircle size={14} color={colors.success} />}
+          {syncStatus === 'connecting' && <RefreshCw size={14} color={colors.warning} />}
+          {syncStatus === 'offline' && <AlertCircle size={14} color={colors.textTertiary} />}
+          {syncStatus === 'error' && <AlertCircle size={14} color={colors.danger} />}
+          <Text style={[styles.syncText, syncStatus === 'connected' && { color: colors.success }, syncStatus === 'connecting' && { color: colors.warning }, (syncStatus === 'offline' || syncStatus === 'error') && { color: colors.danger }]} numberOfLines={1}>
+            {syncStatus === 'connected' ? 'Онлайн' : syncStatus === 'connecting' ? 'Синх...' : syncStatus === 'error' ? 'Ошибка' : 'Локально'}
           </Text>
-        </TouchableOpacity>
+        </View>
         <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
           <LogOut size={20} color={colors.textSecondary} />
         </TouchableOpacity>

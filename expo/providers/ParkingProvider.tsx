@@ -6,6 +6,7 @@ import { DEFAULT_TARIFFS } from '@/constants/tariffs';
 import { generateId, roundMoney, calculateDays, isToday } from '@/utils/helpers';
 import { calculateActiveSessionDebt } from '@/utils/financeCalculations';
 import { MAX_ACCRUAL_DAYS } from '@/constants/tariffs';
+import { initSupabaseTable, loadFromSupabase, saveToSupabase, subscribeToChanges } from '@/utils/supabase';
 import {
   Client, Car, ParkingSession, Payment, Transaction, Debt,
   Tariffs, CashShift, Expense,
@@ -58,36 +59,116 @@ function createEmptyData(): AppData {
   };
 }
 
+export type SyncStatus = 'connecting' | 'connected' | 'offline' | 'error';
+
 export const [ParkingProvider, useParking] = createContextHook(() => {
   const { currentUser, isAdmin } = useAuth();
   const [data, setData] = useState<AppData>(createEmptyData);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
+  const pendingSave = useRef<AppData | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const supabaseReady = useRef(false);
+
+  function applyMigrations(parsed: Partial<AppData>): Partial<AppData> {
+    if (parsed.sessions) {
+      const defaultRate = parsed.tariffs?.lombardRate ?? DEFAULT_TARIFFS.lombardRate;
+      parsed.sessions = parsed.sessions.map(s => ({
+        ...s,
+        lombardRateApplied: s.lombardRateApplied || defaultRate,
+      }));
+    }
+    return parsed;
+  }
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored) as Partial<AppData>;
-          if (parsed.sessions) {
-            const defaultRate = parsed.tariffs?.lombardRate ?? DEFAULT_TARIFFS.lombardRate;
-            parsed.sessions = parsed.sessions.map(s => ({
-              ...s,
-              lombardRateApplied: s.lombardRateApplied || defaultRate,
-            }));
+    let cancelled = false;
+    void (async () => {
+      setSyncStatus('connecting');
+      const tableOk = await initSupabaseTable();
+      if (cancelled) return;
+
+      if (tableOk) {
+        supabaseReady.current = true;
+        const remote = await loadFromSupabase();
+        if (cancelled) return;
+
+        if (remote && Object.keys(remote).length > 0) {
+          const migrated = applyMigrations(remote);
+          setData(prev => ({ ...prev, ...migrated }));
+          void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...createEmptyData(), ...migrated }));
+          setSyncStatus('connected');
+          console.log('[Parking] Loaded from Supabase (centralized DB)');
+        } else {
+          const stored = await AsyncStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            try {
+              const parsed = applyMigrations(JSON.parse(stored) as Partial<AppData>);
+              const merged = { ...createEmptyData(), ...parsed };
+              setData(merged as AppData);
+              await saveToSupabase(merged as AppData);
+              console.log('[Parking] Migrated AsyncStorage data to Supabase');
+            } catch {
+              console.log('[Parking] Failed to parse local data');
+            }
           }
-          setData(prev => ({ ...prev, ...parsed }));
-        } catch {
-          console.log('[Parking] Failed to parse stored data');
+          setSyncStatus('connected');
         }
+      } else {
+        console.log('[Parking] Supabase not available, using AsyncStorage');
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            const parsed = applyMigrations(JSON.parse(stored) as Partial<AppData>);
+            setData(prev => ({ ...prev, ...parsed }));
+          } catch {
+            console.log('[Parking] Failed to parse stored data');
+          }
+        }
+        setSyncStatus('offline');
       }
-      setIsLoaded(true);
-    }).catch(() => setIsLoaded(false));
+      if (!cancelled) setIsLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseReady.current) return;
+    const unsub = subscribeToChanges((newData) => {
+      if (pendingSave.current) {
+        console.log('[Parking] Skipping realtime update (pending local save)');
+        return;
+      }
+      const migrated = applyMigrations(newData);
+      setData(prev => ({ ...prev, ...migrated }));
+      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...createEmptyData(), ...migrated }));
+      console.log('[Parking] Applied realtime update from other device');
+    });
+    return () => { if (unsub) unsub(); };
   }, []);
 
   const persist = useCallback((newData: AppData) => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newData)).catch(e =>
       console.log('[Parking] Persist error:', e)
     );
+
+    if (!supabaseReady.current) return;
+
+    pendingSave.current = newData;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const toSave = pendingSave.current;
+      pendingSave.current = null;
+      if (!toSave) return;
+      const ok = await saveToSupabase(toSave);
+      if (ok) {
+        setSyncStatus('connected');
+        console.log('[Parking] Saved to Supabase');
+      } else {
+        setSyncStatus('error');
+        console.log('[Parking] Failed to save to Supabase');
+      }
+    }, 600);
   }, []);
 
   const update = useCallback((updater: (prev: AppData) => AppData) => {
@@ -2245,8 +2326,9 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     createBackup,
     applyHealing,
     restoreBackup,
+    syncStatus,
   }), [
-    data, isLoaded, currentShift, needsShiftCheck,
+    data, isLoaded, currentShift, needsShiftCheck, syncStatus,
     addClient, addCarToClient, updateClient, deleteClient, updateCar, deleteCar,
     checkIn, checkOut, cancelCheckIn, cancelCheckOut, cancelPayment, earlyExitWithRefund,
     openShift, closeShift, addExpense, payDebt, paySessionDebt, payMonthly, withdrawCash,
