@@ -2188,13 +2188,14 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     console.log(`[paySessionDebt] client=${clientId}, amount=${actualAmount}, method=${method}`);
   }, [currentUser, data.sessions, data.tariffs, data.subscriptions, data.debts, data.shifts, data.clientDebts, currentShift, update, logAction]);
 
-  const addManualDebt = useCallback((clientId: string, amount: number, comment: string) => {
+  const addManualDebt = useCallback((clientId: string, amount: number, comment: string, carId?: string, lombardAccrual?: boolean) => {
     if (!currentUser) return;
     const now = new Date().toISOString();
+    const debtId = generateId();
     const debt: Debt = {
-      id: generateId(),
+      id: debtId,
       clientId,
-      carId: '',
+      carId: carId || '',
       totalAmount: roundMoney(amount),
       remainingAmount: roundMoney(amount),
       status: 'active',
@@ -2202,17 +2203,54 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       createdAt: now,
       isManual: true,
     };
+
+    const newAccruals: DailyDebtAccrual[] = [];
+    let updatedClientDebts = [...data.clientDebts];
+
+    if (lombardAccrual && carId) {
+      const rate = data.tariffs.lombardRate;
+      newAccruals.push({
+        id: generateId(),
+        parkingEntryId: debtId,
+        clientId,
+        carId,
+        amount: rate,
+        tariffRate: rate,
+        accrualDate: now.split('T')[0],
+      });
+      const cdIdx = updatedClientDebts.findIndex(cd => cd.clientId === clientId);
+      if (cdIdx >= 0) {
+        updatedClientDebts[cdIdx] = {
+          ...updatedClientDebts[cdIdx],
+          totalAmount: updatedClientDebts[cdIdx].totalAmount + amount,
+          activeAmount: updatedClientDebts[cdIdx].activeAmount + amount,
+          lastUpdate: now,
+        };
+      } else {
+        updatedClientDebts.push({
+          id: generateId(),
+          clientId,
+          totalAmount: amount,
+          frozenAmount: 0,
+          activeAmount: amount,
+          lastUpdate: now,
+        });
+      }
+    }
+
     update(prev => ({
       ...prev,
       debts: [...prev.debts, debt],
+      dailyDebtAccruals: [...prev.dailyDebtAccruals, ...newAccruals],
+      clientDebts: lombardAccrual ? updatedClientDebts : prev.clientDebts,
       transactions: [{
         id: generateId(), type: 'debt' as const, amount: roundMoney(amount),
-        description: comment || 'Ручной долг', clientId,
+        description: comment || 'Ручной долг', clientId, carId,
         operatorId: currentUser.id, operatorName: currentUser.name, date: now,
       }, ...prev.transactions],
     }));
-    logAction('debt_add', 'Долг добавлен', `${amount}: ${comment}`, debt.id, 'debt');
-  }, [currentUser, update, logAction]);
+    logAction('debt_add', 'Долг добавлен', `${amount}: ${comment}${lombardAccrual ? ' (ломбард)' : ''}`, debt.id, 'debt');
+  }, [currentUser, data.clientDebts, data.tariffs, update, logAction]);
 
   const deleteDebt = useCallback((debtId: string) => {
     if (!currentUser) return;

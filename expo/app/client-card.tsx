@@ -50,6 +50,8 @@ export default function ClientCardScreen() {
   const [addingDebt, setAddingDebt] = useState(false);
   const [debtAmount, setDebtAmount] = useState('');
   const [debtComment, setDebtComment] = useState('');
+  const [debtCarId, setDebtCarId] = useState<string | null>(null);
+  const [debtLombard, setDebtLombard] = useState(false);
 
   const [showHistory, setShowHistory] = useState(false);
   const [showEditHistory, setShowEditHistory] = useState(false);
@@ -202,12 +204,18 @@ export default function ClientCardScreen() {
       Alert.alert('Ошибка', 'Введите сумму');
       return;
     }
-    addManualDebt(clientId, amt, debtComment.trim());
+    if (debtLombard && !debtCarId) {
+      Alert.alert('Ошибка', 'Выберите авто для ломбардного долга');
+      return;
+    }
+    addManualDebt(clientId, amt, debtComment.trim(), debtCarId ?? undefined, debtLombard);
     setDebtAmount('');
     setDebtComment('');
+    setDebtCarId(null);
+    setDebtLombard(false);
     setAddingDebt(false);
-    Alert.alert('Готово', 'Долг добавлен');
-  }, [clientId, debtAmount, debtComment, addManualDebt]);
+    Alert.alert('Готово', `Долг добавлен${debtLombard ? ' (ломбард, ежедневное начисление)' : ''}`);
+  }, [clientId, debtAmount, debtComment, debtCarId, debtLombard, addManualDebt]);
 
   const handleCancelCheckOut = useCallback((sessionId: string) => {
     Alert.alert('Отмена выезда', 'Вернуть автомобиль на парковку?', [
@@ -646,12 +654,56 @@ export default function ClientCardScreen() {
             <View style={styles.addCarForm}>
               <TextInput style={styles.editInput} value={debtAmount} onChangeText={setDebtAmount} placeholder="Сумма" placeholderTextColor={colors.textTertiary} keyboardType="numeric" />
               <TextInput style={styles.editInput} value={debtComment} onChangeText={setDebtComment} placeholder="Комментарий" placeholderTextColor={colors.textTertiary} />
+
+              {clientCars.length > 0 && (
+                <View>
+                  <Text style={styles.debtFormLabel}>Авто (необязательно)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.debtCarScroll}>
+                    <TouchableOpacity
+                      style={[styles.debtCarChip, !debtCarId && styles.debtCarChipActive]}
+                      onPress={() => setDebtCarId(null)}
+                    >
+                      <Text style={[styles.debtCarChipText, !debtCarId && styles.debtCarChipTextActive]}>Без авто</Text>
+                    </TouchableOpacity>
+                    {clientCars.map(car => (
+                      <TouchableOpacity
+                        key={car.id}
+                        style={[styles.debtCarChip, debtCarId === car.id && styles.debtCarChipActive]}
+                        onPress={() => setDebtCarId(car.id)}
+                      >
+                        <Text style={[styles.debtCarChipText, debtCarId === car.id && styles.debtCarChipTextActive]}>
+                          {car.plateNumber}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[styles.lombardToggle, debtLombard && styles.lombardToggleActive]}
+                onPress={() => {
+                  setDebtLombard(!debtLombard);
+                  if (!debtLombard && clientCars.length > 0 && !debtCarId) {
+                    setDebtCarId(clientCars[0].id);
+                  }
+                }}
+              >
+                <View style={[styles.lombardCheckbox, debtLombard && styles.lombardCheckboxActive]}>
+                  {debtLombard && <Check size={12} color={colors.white} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.lombardToggleText, debtLombard && styles.lombardToggleTextActive]}>Ломбард (ежедневное начисление)</Text>
+                  <Text style={styles.lombardToggleSub}>{formatMoney(tariffs.lombardRate)}/сут.</Text>
+                </View>
+              </TouchableOpacity>
+
               <View style={styles.editActions}>
                 <TouchableOpacity style={[styles.editSaveBtn, { backgroundColor: colors.danger }]} onPress={handleAddDebt}>
                   <Check size={16} color={colors.white} />
                   <Text style={styles.editSaveText}>Добавить долг</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.editCancelBtn} onPress={() => setAddingDebt(false)}>
+                <TouchableOpacity style={styles.editCancelBtn} onPress={() => { setAddingDebt(false); setDebtCarId(null); setDebtLombard(false); }}>
                   <X size={16} color={colors.danger} />
                 </TouchableOpacity>
               </View>
@@ -1036,4 +1088,27 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   subscriptionBannerTitle: { fontSize: 14, fontWeight: '700' as const, color: colors.success },
   subscriptionBannerSub: { fontSize: 12, color: colors.success, marginTop: 2, opacity: 0.85 },
+  debtFormLabel: { fontSize: 12, fontWeight: '500' as const, color: colors.textSecondary, marginBottom: 6 },
+  debtCarScroll: { marginBottom: 8 },
+  debtCarChip: {
+    backgroundColor: colors.surfaceLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
+    marginRight: 8, borderWidth: 1, borderColor: colors.border,
+  },
+  debtCarChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  debtCarChipText: { fontSize: 13, fontWeight: '600' as const, color: colors.textSecondary },
+  debtCarChipTextActive: { color: colors.white },
+  lombardToggle: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10,
+    backgroundColor: colors.surfaceLight, borderRadius: 10, padding: 12,
+    borderWidth: 1, borderColor: colors.border, marginBottom: 8,
+  },
+  lombardToggleActive: { backgroundColor: colors.warningSurface, borderColor: colors.warning + '40' },
+  lombardCheckbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.border,
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
+  lombardCheckboxActive: { backgroundColor: colors.warning, borderColor: colors.warning },
+  lombardToggleText: { fontSize: 13, fontWeight: '600' as const, color: colors.textSecondary },
+  lombardToggleTextActive: { color: colors.warning },
+  lombardToggleSub: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
 });
