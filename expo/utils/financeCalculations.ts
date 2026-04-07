@@ -170,7 +170,7 @@ export function calculateActiveSessionDebt(
 
   if (session.serviceType === 'lombard' || session.status === 'active_debt') {
     const rate = session.lombardRateApplied || tariffs.lombardRate;
-    const days = calculateDays(session.entryTime);
+    const days = calculateDays(session.entryTime, undefined, true);
     return roundMoney(Math.max(0, days * rate - totalPaid));
   }
 

@@ -22,11 +22,12 @@ export default function ParkingScreen() {
       .map(session => {
         const car = activeCars.find(c => c.id === session.carId);
         const client = activeClients.find(c => c.id === session.clientId);
-        const days = calculateDays(session.entryTime);
+        const isLombard = session.serviceType === 'lombard';
+        const days = calculateDays(session.entryTime, undefined, isLombard);
         let cost = 0;
         if (session.serviceType === 'onetime') {
           cost = days * (session.prepaidMethod === 'card' ? tariffs.onetimeCard : tariffs.onetimeCash);
-        } else if (session.serviceType === 'lombard') {
+        } else if (isLombard) {
           cost = days * (session.lombardRateApplied || tariffs.lombardRate);
         }
         return { session, car, client, days, cost };

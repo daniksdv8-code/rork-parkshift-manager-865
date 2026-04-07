@@ -404,7 +404,7 @@ export default function ClientCardScreen() {
           <Text style={styles.sectionTitle}>На парковке сейчас</Text>
           {clientSessions.map(session => {
             const car = clientCars.find(c => c.id === session.carId);
-            const days = calculateDays(session.entryTime);
+            const days = calculateDays(session.entryTime, undefined, session.serviceType === 'lombard');
             return (
               <View key={session.id} style={styles.sessionCard}>
                 <View style={styles.sessionHeader}>

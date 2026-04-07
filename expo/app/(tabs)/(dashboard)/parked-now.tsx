@@ -39,7 +39,7 @@ export default function ParkedNowScreen() {
   const renderItem = ({ item }: { item: ParkingSession }) => {
     const car = activeCars.find(c => c.id === item.carId);
     const client = activeClients.find(c => c.id === item.clientId);
-    const days = calculateDays(item.entryTime);
+    const days = calculateDays(item.entryTime, undefined, item.serviceType === 'lombard');
     const typeColors: Record<string, string> = {
       onetime: colors.textSecondary,
       monthly: colors.info,

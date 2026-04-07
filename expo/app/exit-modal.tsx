@@ -38,7 +38,8 @@ export default function ExitModal() {
 
   const exitCalc = useMemo(() => {
     if (!session) return null;
-    const days = calculateDays(session.entryTime);
+    const isLombardSession = session.serviceType === 'lombard' || session.status === 'active_debt';
+    const days = calculateDays(session.entryTime, undefined, isLombardSession);
 
     if (session.serviceType === 'onetime') {
       const standardRate = session.prepaidMethod === 'card' ? tariffs.onetimeCard : tariffs.onetimeCash;

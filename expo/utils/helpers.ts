@@ -19,10 +19,10 @@ export function formatPlateNumber(plate: string): string {
   return plate.toUpperCase().replace(/\s+/g, '').trim();
 }
 
-export function calculateDays(entryTime: string, exitTime?: string): number {
+export function calculateDays(entryTime: string, exitTime?: string, skipGrace?: boolean): number {
   const entry = new Date(entryTime).getTime();
   const exit = exitTime ? new Date(exitTime).getTime() : Date.now();
-  const graceMs = GRACE_HOURS * 60 * 60 * 1000;
+  const graceMs = skipGrace ? 0 : GRACE_HOURS * 60 * 60 * 1000;
   const diffMs = exit - entry - graceMs;
   const dayMs = 24 * 60 * 60 * 1000;
   return Math.max(1, Math.ceil(diffMs / dayMs));

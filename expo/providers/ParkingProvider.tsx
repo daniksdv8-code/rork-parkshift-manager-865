@@ -583,7 +583,8 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     const now = new Date().toISOString();
     const tariffs = data.tariffs;
     const car = data.cars.find(c => c.id === session.carId);
-    const days = calculateDays(session.entryTime, now);
+    const isLombardExit = session.serviceType === 'lombard' || session.status === 'active_debt';
+    const days = calculateDays(session.entryTime, now, isLombardExit);
 
     let newStatus: ParkingSession['status'] = 'completed';
     const newTransactions: Transaction[] = [];
@@ -1911,7 +1912,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       );
 
       for (const session of debtSessions) {
-        const days = calculateDays(session.entryTime);
+        const days = calculateDays(session.entryTime, undefined, true);
         const elapsedDays = Math.min(MAX_ACCRUAL_DAYS, days);
         const existingCount = prev.dailyDebtAccruals.filter(a => a.parkingEntryId === session.id).length;
         const extraDays = elapsedDays - existingCount;
@@ -2564,7 +2565,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
         .reduce((sum, a) => sum + a.amount, 0);
     }
     const rate = session.lombardRateApplied || data.tariffs.lombardRate;
-    const days = calculateDays(session.entryTime, session.exitTime ?? undefined);
+    const days = calculateDays(session.entryTime, session.exitTime ?? undefined, true);
     return roundMoney(days * rate);
   }, [data.sessions, data.dailyDebtAccruals, data.tariffs.lombardRate]);
 

@@ -138,7 +138,7 @@ export default function DebtorsScreen() {
                 <Text style={styles.breakdownTitle}>Активные сессии</Text>
                 {breakdown.sessions.map(s => {
                   const car = activeCars.find(c => c.id === s.carId);
-                  const days = calculateDays(s.entryTime);
+                  const days = calculateDays(s.entryTime, undefined, s.serviceType === 'lombard');
                   return (
                     <View key={s.id} style={styles.sessionRow}>
                       <Car size={12} color={colors.textTertiary} />
