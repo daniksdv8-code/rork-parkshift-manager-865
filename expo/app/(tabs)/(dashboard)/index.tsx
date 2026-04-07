@@ -8,7 +8,7 @@ import {
   Banknote, CreditCard, Car, AlertTriangle, Clock,
   PlayCircle, LogOut, ChevronRight, Shield, Wallet, StopCircle,
   Sparkles, Search, FileEdit, X, CheckCircle, RefreshCw,
-  AlertCircle, UserPlus, ArrowRightLeft, TrendingUp,
+  AlertCircle, UserPlus, ArrowRightLeft, TrendingUp, Calendar,
 } from 'lucide-react-native';
 import { useAuth } from '@/providers/AuthProvider';
 import { useParking } from '@/providers/ParkingProvider';
@@ -406,7 +406,7 @@ export default function DashboardScreen() {
           {[
             { label: 'Новый клиент', icon: UserPlus, route: '/add-client-modal' },
             { label: 'Касса', icon: Wallet, route: '/cashregister-screen' },
-            { label: 'Должники', icon: AlertTriangle, route: '/debtors-screen' },
+            { label: 'Календарь смен', icon: Calendar, route: '/more/schedule' },
             { label: 'История', icon: Clock, route: '/history-screen' },
           ].map((item, i) => (
             <TouchableOpacity key={i} style={styles.quickBtn} onPress={() => router.push(item.route as never)}>
