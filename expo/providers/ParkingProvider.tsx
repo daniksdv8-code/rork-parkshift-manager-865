@@ -503,6 +503,21 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
         clientId: params.clientId, carId: params.carId,
         amount: rate, tariffRate: rate, accrualDate: now.split('T')[0],
       });
+
+      newDebts.push({
+        id: generateId(), clientId: params.clientId, carId: params.carId,
+        parkingEntryId: sessionId, totalAmount: roundMoney(rate),
+        remainingAmount: roundMoney(rate), status: 'active',
+        description: 'Долг ломбарда (начисление за 1-е сутки)', createdAt: now,
+      });
+      newTransactions.push({
+        id: generateId(), type: 'debt', amount: roundMoney(rate),
+        description: 'Долг ломбарда (начисление за 1-е сутки)',
+        clientId: params.clientId, carId: params.carId, sessionId,
+        operatorId: currentUser.id, operatorName: currentUser.name, date: now,
+        shiftId: currentShift?.id,
+      });
+
       const existingCd = updatedClientDebts.find(cd => cd.clientId === params.clientId);
       if (existingCd) {
         updatedClientDebts = updatedClientDebts.map(cd =>
