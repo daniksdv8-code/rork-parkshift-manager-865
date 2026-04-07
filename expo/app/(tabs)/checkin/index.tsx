@@ -44,17 +44,26 @@ export default function CheckinScreen() {
 
   const searchResults = useMemo(() => {
     if (plateSearch.trim().length < 1) return [];
-    const q = normalizeForSearch(plateSearch);
+    const q = normalizeForSearch(plateSearch).replace(/[^A-ZА-Я0-9]/g, '');
+    if (q.length < 1) return [];
     console.log('[CheckinSearch] query normalized:', JSON.stringify(q), 'activeCars:', activeCars.length);
-    const byPlate = activeCars.filter(c =>
-      normalizeForSearch(c.plateNumber).includes(q)
-    );
-    const carResults = byPlate.map(car => ({
-      car,
-      client: activeClients.find(cl => cl.id === car.clientId),
-      isParked: activeSessions.some(s => s.carId === car.id),
-    }));
-    return carResults.slice(0, 10);
+    const scored = activeCars
+      .map(car => {
+        const plateCleaned = normalizeForSearch(car.plateNumber).replace(/[^A-ZА-Я0-9]/g, '');
+        if (!plateCleaned.includes(q)) return null;
+        const isExact = plateCleaned === q;
+        const isPrefix = plateCleaned.startsWith(q);
+        const score = isExact ? 0 : isPrefix ? 1 : 2;
+        return {
+          car,
+          client: activeClients.find(cl => cl.id === car.clientId),
+          isParked: activeSessions.some(s => s.carId === car.id),
+          score,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => a.score - b.score);
+    return scored.slice(0, 10).map(({ car, client, isParked }) => ({ car, client, isParked }));
   }, [plateSearch, activeCars, activeClients, activeSessions]);
 
   const baseAmount = useMemo(() => {
