@@ -44,7 +44,23 @@ export default function ClientsScreen() {
           item.cars.some(c => normalizeForSearch(c.plateNumber).includes(q))
         );
       })
-      .sort((a, b) => a.client.name.localeCompare(b.client.name));
+      .sort((a, b) => {
+        if (!search) return a.client.name.localeCompare(b.client.name);
+        const q = normalizeForSearch(search);
+        const rawQ = search.trim();
+        const phoneQ = normalizePhone(rawQ);
+        const aExact = normalizeForSearch(a.client.name) === q
+          || normalizePhone(a.client.phone) === phoneQ
+          || (a.client.phone2 ? normalizePhone(a.client.phone2) === phoneQ : false)
+          || a.cars.some(c => normalizeForSearch(c.plateNumber) === q);
+        const bExact = normalizeForSearch(b.client.name) === q
+          || normalizePhone(b.client.phone) === phoneQ
+          || (b.client.phone2 ? normalizePhone(b.client.phone2) === phoneQ : false)
+          || b.cars.some(c => normalizeForSearch(c.plateNumber) === q);
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return a.client.name.localeCompare(b.client.name);
+      });
   }, [activeClients, activeCars, activeSessions, search, filter, getClientDebtTotal]);
 
   const styles = useMemo(() => createStyles(colors), [colors]);

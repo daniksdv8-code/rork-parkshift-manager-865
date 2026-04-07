@@ -88,9 +88,9 @@ export default function HistoryScreen() {
   }, [filterType, filterOperator, filterMethod]);
 
   const allClientsMap = useMemo(() => {
-    const map = new Map<string, { name: string; phone?: string }>();
-    clients.forEach(c => map.set(c.id, { name: c.name, phone: c.phone }));
-    activeClients.forEach(c => { if (!map.has(c.id)) map.set(c.id, { name: c.name, phone: c.phone }); });
+    const map = new Map<string, { name: string; phone?: string; phone2?: string }>();
+    clients.forEach(c => map.set(c.id, { name: c.name, phone: c.phone, phone2: c.phone2 }));
+    activeClients.forEach(c => { if (!map.has(c.id)) map.set(c.id, { name: c.name, phone: c.phone, phone2: c.phone2 }); });
     return map;
   }, [clients, activeClients]);
 
@@ -133,7 +133,8 @@ export default function HistoryScreen() {
         const matchPlate = car ? normalizeForSearch(car.plateNumber).includes(q) : false;
         const matchName = client ? normalizeForSearch(client.name).includes(q) : false;
         const matchPhone = client ? normalizePhone(client.phone ?? '').includes(phoneQ) : false;
-        if (!matchPlate && !matchName && !matchPhone) return false;
+        const matchPhone2 = client?.phone2 ? normalizePhone(client.phone2).includes(phoneQ) : false;
+        if (!matchPlate && !matchName && !matchPhone && !matchPhone2) return false;
       }
 
       return true;
