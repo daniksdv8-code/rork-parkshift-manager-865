@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Alert, TextInput, Animated, Easing,
+  RefreshControl, Alert, TextInput, Animated, Easing, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -43,6 +43,8 @@ export default function DashboardScreen() {
   const [showChecklist, setShowChecklist] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [showShiftModal, setShowShiftModal] = useState(false);
+  const [shiftCashInput, setShiftCashInput] = useState('');
 
 
   const fadeAnimsRef = useRef([0, 1, 2, 3].map(() => new Animated.Value(0)));
@@ -176,36 +178,29 @@ export default function DashboardScreen() {
 
   const handleOpenShift = useCallback(() => {
     hapticMedium();
-    Alert.prompt(
-      'Открытие смены',
-      `Общая касса с прошлой смены: ${formatMoney(previousCash)}\n\nУкажите сумму, которую принимаете (пусто = ${previousCash}):`,
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Открыть',
-          onPress: (value?: string) => {
-            const cash = value?.trim() ? parseFloat(value.replace(',', '.')) : undefined;
-            if (cash !== undefined && (isNaN(cash) || cash < 0)) {
-              Alert.alert('Ошибка', 'Введите корректную сумму');
-              return;
-            }
-            const result = openShift(cash);
-            if (result && 'blocked' in result) {
-              Alert.alert('Смена занята', `Сейчас работает ${result.operatorName}.`);
-              return;
-            }
-            if (result) {
-              hapticSuccess();
-              Alert.alert('Готово', `Смена открыта. Принято: ${formatMoney(cash ?? previousCash)}`);
-            }
-          },
-        },
-      ],
-      'plain-text',
-      String(previousCash),
-      'numeric'
-    );
-  }, [openShift, previousCash]);
+    setShiftCashInput(String(previousCash));
+    setShowShiftModal(true);
+  }, [previousCash]);
+
+  const handleConfirmOpenShift = useCallback(() => {
+    const value = shiftCashInput.trim();
+    const cash = value ? parseFloat(value.replace(',', '.')) : undefined;
+    if (cash !== undefined && (isNaN(cash) || cash < 0)) {
+      Alert.alert('Ошибка', 'Введите корректную сумму');
+      return;
+    }
+    const result = openShift(cash);
+    if (result && 'blocked' in result) {
+      Alert.alert('Смена занята', `Сейчас работает ${result.operatorName}.`);
+      setShowShiftModal(false);
+      return;
+    }
+    if (result) {
+      hapticSuccess();
+      setShowShiftModal(false);
+      Alert.alert('Готово', `Смена открыта. Принято: ${formatMoney(cash ?? previousCash)}`);
+    }
+  }, [openShift, previousCash, shiftCashInput]);
 
   const handleLogout = useCallback(() => {
     hapticMedium();
@@ -361,7 +356,7 @@ export default function DashboardScreen() {
 
       <View style={styles.statsGrid}>
         {stats.map((stat, i) => (
-          <Animated.View key={i} style={{ opacity: fadeAnims[i] ?? 1, transform: [{ translateY: slideAnims[i] ?? 0 }], flex: 1, minWidth: '45%' as unknown as number }}>
+          <Animated.View key={i} style={[styles.statAnimWrap, { opacity: fadeAnims[i] ?? 1, transform: [{ translateY: slideAnims[i] ?? 0 }] }]}>
             <TouchableOpacity style={styles.statCard} onPress={() => stat.route && router.push(stat.route as never)} activeOpacity={stat.route ? 0.7 : 1}>
               <View style={[styles.statIconWrap, { backgroundColor: stat.color + '15' }]}>
                 <stat.icon size={20} color={stat.color} />
@@ -452,6 +447,34 @@ export default function DashboardScreen() {
       {showChecklist && getTodayCleaningShift && (
         <CleaningChecklist shiftId={getTodayCleaningShift.id} onClose={() => setShowChecklist(false)} />
       )}
+
+      <Modal visible={showShiftModal} transparent animationType="fade">
+        <KeyboardAvoidingView style={styles.shiftModalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.shiftModalContent}>
+            <Text style={styles.shiftModalTitle}>Открытие смены</Text>
+            <Text style={styles.shiftModalSub}>Общая касса с прошлой смены: {formatMoney(previousCash)}</Text>
+            <Text style={styles.shiftModalLabel}>Сумма, которую принимаете:</Text>
+            <TextInput
+              style={styles.shiftModalInput}
+              value={shiftCashInput}
+              onChangeText={setShiftCashInput}
+              keyboardType="numeric"
+              placeholder={String(previousCash)}
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              selectTextOnFocus
+            />
+            <View style={styles.shiftModalBtns}>
+              <TouchableOpacity style={styles.shiftModalCancelBtn} onPress={() => setShowShiftModal(false)}>
+                <Text style={styles.shiftModalCancelText}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shiftModalConfirmBtn} onPress={handleConfirmOpenShift}>
+                <Text style={styles.shiftModalConfirmText}>Открыть</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {expiringSubscriptions.length > 0 && (
         <View style={styles.section}>
@@ -557,4 +580,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   syncText: { fontSize: 11, fontWeight: '600' as const },
   globalSearchBtn: { backgroundColor: colors.primarySurface, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   globalSearchText: { fontSize: 11, fontWeight: '600' as const, color: colors.primary },
+  statAnimWrap: { flexBasis: '47%' as unknown as number, flexGrow: 1 },
+  shiftModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  shiftModalContent: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, width: '100%', maxWidth: 340 },
+  shiftModalTitle: { fontSize: 18, fontWeight: '700' as const, color: colors.text, marginBottom: 6 },
+  shiftModalSub: { fontSize: 13, color: colors.textSecondary, marginBottom: 16 },
+  shiftModalLabel: { fontSize: 13, fontWeight: '600' as const, color: colors.textSecondary, marginBottom: 6 },
+  shiftModalInput: { backgroundColor: colors.surfaceLight, borderRadius: 10, padding: 12, fontSize: 18, fontWeight: '700' as const, color: colors.text, borderWidth: 1, borderColor: colors.border, textAlign: 'center' as const, marginBottom: 16 },
+  shiftModalBtns: { flexDirection: 'row', gap: 10 },
+  shiftModalCancelBtn: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border },
+  shiftModalCancelText: { fontSize: 15, fontWeight: '600' as const, color: colors.textSecondary },
+  shiftModalConfirmBtn: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.primary },
+  shiftModalConfirmText: { fontSize: 15, fontWeight: '700' as const, color: colors.white },
 });

@@ -205,7 +205,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     return !currentShift;
   }, [currentUser, currentShift]);
 
-  const addClient = useCallback((name: string, phone: string, plateNumber: string, carModel: string, notes?: string): Client => {
+  const addClient = useCallback((name: string, phone: string, plateNumber: string, carModel: string, notes?: string): Client & { carId: string } => {
     const clientId = generateId();
     const carId = generateId();
     const now = new Date().toISOString();
@@ -224,7 +224,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     }));
 
     logAction('client_add', 'Новый клиент', `${name}, ${phone}, ${plateNumber}`);
-    return client;
+    return { ...client, carId };
   }, [update, logAction]);
 
   const addCarToClient = useCallback((clientId: string, plateNumber: string, carModel: string): Car => {
@@ -847,7 +847,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       dailyDebtAccruals: prev.dailyDebtAccruals.filter(a => a.parkingEntryId !== sessionId),
       transactions: [...newTransactions, ...prev.transactions],
       shifts: updatedShifts,
-      payments: updatedPayments.map(p => prev.payments.find(pp => pp.id === p.id) ? p : p),
+      payments: updatedPayments,
       subscriptions: updatedSubs,
       adminCashOperations: [...newAdminOps, ...prev.adminCashOperations],
     }));

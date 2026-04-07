@@ -57,18 +57,19 @@ export function calculateClientDebtBreakdown(
   overstayTotal: number;
   total: number;
 } {
+  const activeSessions = sessions.filter(
+    s => s.clientId === clientId && ['active', 'active_debt'].includes(s.status) && !s.cancelled
+  );
+  const activeSessionIds = new Set(activeSessions.map(s => s.id));
+
   const oldDebtsTotal = debts
-    .filter(d => d.clientId === clientId && d.status === 'active')
+    .filter(d => d.clientId === clientId && d.status === 'active' && !activeSessionIds.has(d.parkingEntryId ?? ''))
     .reduce((s, d) => s + d.remainingAmount, 0);
 
   const cd = clientDebts.find(c => c.clientId === clientId);
   const clientDebtTotal = cd?.totalAmount ?? 0;
 
   let overstayTotal = 0;
-  const activeSessions = sessions.filter(
-    s => s.clientId === clientId && ['active', 'active_debt'].includes(s.status) && !s.cancelled
-  );
-
   for (const session of activeSessions) {
     if (session.serviceType === 'onetime') {
       const days = calculateDays(session.entryTime);
@@ -83,11 +84,15 @@ export function calculateClientDebtBreakdown(
     }
   }
 
+  const sessionDebtTotal = clientDebtTotal;
+  const standaloneDebtTotal = oldDebtsTotal;
+  const total = roundMoney(standaloneDebtTotal + sessionDebtTotal + overstayTotal);
+
   return {
-    oldDebtsTotal: roundMoney(oldDebtsTotal),
-    clientDebtTotal: roundMoney(clientDebtTotal),
+    oldDebtsTotal: roundMoney(standaloneDebtTotal),
+    clientDebtTotal: roundMoney(sessionDebtTotal),
     overstayTotal: roundMoney(overstayTotal),
-    total: roundMoney(oldDebtsTotal + clientDebtTotal + overstayTotal),
+    total,
   };
 }
 

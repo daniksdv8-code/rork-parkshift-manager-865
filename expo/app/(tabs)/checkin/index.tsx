@@ -144,12 +144,11 @@ export default function CheckinScreen() {
         Alert.alert('Ошибка', 'Введите номер авто');
         return;
       }
-      const client = addClient(newName.trim(), newPhone.trim(), plate, newModel.trim());
-      clientId = client.id;
-      const cars = activeCars;
-      carId = cars.find(c => c.clientId === clientId && c.plateNumber === plate)?.id;
+      const result = addClient(newName.trim(), newPhone.trim(), plate, newModel.trim());
+      clientId = result.id;
+      carId = result.carId;
       if (!carId) {
-        Alert.alert('Ошибка', 'Не удалось создать авто');
+        Alert.alert('Ошибка', 'Не удалось создать авто. Попробуйте снова.');
         return;
       }
     }
@@ -196,7 +195,7 @@ export default function CheckinScreen() {
     }
   }, [
     currentUser, needsShiftCheck, isAdmin, selectedCar, selectedClient,
-    showNewClient, newName, newPhone, newModel, plateSearch, addClient, activeCars,
+    showNewClient, newName, newPhone, newModel, plateSearch, addClient,
     activeSessions, serviceType, paymentMethod, inDebt, finalAmount, baseAmount,
     days, checkIn, customAmountEnabled, adjustmentReason, resetForm, sessionNote, addSessionNote,
   ]);

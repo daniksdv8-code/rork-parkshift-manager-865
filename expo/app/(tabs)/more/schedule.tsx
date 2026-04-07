@@ -98,7 +98,7 @@ export default function ScheduleScreen() {
 
   const openAddModal = useCallback((date: string) => {
     if (!canEditSchedule) {
-      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при закрытой смене');
+      Alert.alert('Нет доступа', 'Редактирование календаря доступно только администраторам и менеджерам');
       return;
     }
     setSelectedDate(date);
@@ -127,7 +127,7 @@ export default function ScheduleScreen() {
 
   const openEditModal = useCallback((shift: typeof activeScheduledShifts[0]) => {
     if (!canEditSchedule) {
-      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при закрытой смене');
+      Alert.alert('Нет доступа', 'Редактирование календаря доступно только администраторам и менеджерам');
       return;
     }
     setSelectedDate(shift.date);
@@ -197,7 +197,7 @@ export default function ScheduleScreen() {
 
   const handleDelete = useCallback((shiftId: string) => {
     if (!canEditSchedule) {
-      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при закрытой смене');
+      Alert.alert('Нет доступа', 'Редактирование календаря доступно только администраторам и менеджерам');
       return;
     }
     Alert.alert('Удалить смену', 'Удалить эту смену?', [

@@ -237,11 +237,11 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Тарифы</Text>
         {([
-          { key: 'monthlyCash' as const, label: 'Месячный (нал), ₽/день' },
-          { key: 'monthlyCard' as const, label: 'Месячный (безнал), ₽/день' },
-          { key: 'onetimeCash' as const, label: 'Разовый (нал), ₽' },
-          { key: 'onetimeCard' as const, label: 'Разовый (безнал), ₽' },
-          { key: 'lombardRate' as const, label: 'Ломбард, ₽/сутки' },
+          { key: 'monthlyCash' as const, label: 'Месячный (нал), ₸/день' },
+          { key: 'monthlyCard' as const, label: 'Месячный (безнал), ₸/день' },
+          { key: 'onetimeCash' as const, label: 'Разовый (нал), ₸' },
+          { key: 'onetimeCard' as const, label: 'Разовый (безнал), ₸' },
+          { key: 'lombardRate' as const, label: 'Ломбард, ₸/сутки' },
         ]).map(t => (
           <View key={t.key} style={styles.tariffRow}>
             <Text style={styles.tariffLabel}>{t.label}</Text>

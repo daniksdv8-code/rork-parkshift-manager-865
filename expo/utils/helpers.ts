@@ -11,8 +11,8 @@ export function roundMoney(value: number): number {
 
 export function formatMoney(value: number): string {
   const rounded = roundMoney(value);
-  if (isNaN(rounded) || !isFinite(rounded)) return '0 \u20BD';
-  return rounded.toLocaleString('ru-RU') + ' \u20BD';
+  if (isNaN(rounded) || !isFinite(rounded)) return '0 ₸';
+  return rounded.toLocaleString('ru-RU') + ' ₸';
 }
 
 export function formatPlateNumber(plate: string): string {

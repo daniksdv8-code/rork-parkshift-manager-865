@@ -105,6 +105,10 @@ export default function HistoryScreen() {
     const now = new Date();
     if (period === 'day') {
       now.setDate(now.getDate() - offset);
+    } else if (period === 'month') {
+      now.setMonth(now.getMonth() - offset);
+    } else if (period === 'year') {
+      now.setFullYear(now.getFullYear() - offset);
     }
 
     return transactions.filter(t => {
@@ -269,24 +273,24 @@ export default function HistoryScreen() {
           </TouchableOpacity>
         </View>
 
-        {period === 'day' && (
-          <View style={styles.navRow}>
-            <TouchableOpacity onPress={() => setOffset(o => o + 1)}>
-              <ChevronLeft size={22} color={colors.textSecondary} />
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => setOffset(o => o + 1)}>
+            <ChevronLeft size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <Text style={styles.navText}>
+            {period === 'day' && (offset === 0 ? 'Сегодня' : (() => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }); })())}
+            {period === 'month' && (() => { const d = new Date(); d.setMonth(d.getMonth() - offset); return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }); })()}
+            {period === 'year' && (() => { const d = new Date(); d.setFullYear(d.getFullYear() - offset); return String(d.getFullYear()); })()}
+          </Text>
+          <TouchableOpacity onPress={() => setOffset(o => Math.max(0, o - 1))} disabled={offset === 0}>
+            <ChevronRight size={22} color={offset === 0 ? colors.textTertiary : colors.textSecondary} />
+          </TouchableOpacity>
+          {offset > 0 && (
+            <TouchableOpacity onPress={() => setOffset(0)}>
+              <X size={18} color={colors.textSecondary} />
             </TouchableOpacity>
-            <Text style={styles.navText}>
-              {offset === 0 ? 'Сегодня' : `${offset} дн. назад`}
-            </Text>
-            <TouchableOpacity onPress={() => setOffset(o => Math.max(0, o - 1))} disabled={offset === 0}>
-              <ChevronRight size={22} color={offset === 0 ? colors.textTertiary : colors.textSecondary} />
-            </TouchableOpacity>
-            {offset > 0 && (
-              <TouchableOpacity onPress={() => setOffset(0)}>
-                <X size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+          )}
+        </View>
 
         <View style={styles.summaryRow}>
           <Text style={styles.countText}>{filteredTx.length} операций</Text>
