@@ -212,7 +212,7 @@ export default function CheckinModalScreen() {
           <TouchableOpacity
             key={type}
             style={[styles.segmentBtn, serviceType === type && styles.segmentBtnActive]}
-            onPress={() => { setServiceType(type); setCustomAmountEnabled(false); setCustomAmount(''); }}
+            onPress={() => { setServiceType(type); setCustomAmountEnabled(false); setCustomAmount(''); if (type === 'lombard') { setInDebt(false); setLombardPrepay(false); setLombardPrepayAmount(''); } }}
           >
             <Text style={[styles.segmentText, serviceType === type && styles.segmentTextActive]} numberOfLines={1} adjustsFontSizeToFit>
               {getServiceTypeLabel(type)}

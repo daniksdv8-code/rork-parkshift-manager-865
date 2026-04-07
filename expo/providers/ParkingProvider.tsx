@@ -412,7 +412,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       shiftId: currentShift?.id,
     });
 
-    if (params.paymentAmount && params.paymentAmount > 0 && !params.inDebt && params.paymentMethod) {
+    if (params.paymentAmount && params.paymentAmount > 0 && !params.inDebt && !isLombard && params.paymentMethod) {
       const paymentId = generateId();
       newPayments.push({
         id: paymentId, clientId: params.clientId, carId: params.carId, sessionId,
