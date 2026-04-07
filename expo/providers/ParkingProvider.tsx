@@ -2332,6 +2332,96 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     }
   }, [data.users, persist, logAction]);
 
+  const exportClientsJson = useCallback((): string => {
+    const clients = data.clients.filter(c => !c.deleted);
+    const cars = data.cars.filter(c => !c.deleted);
+    const subscriptions = data.subscriptions.filter(s =>
+      clients.some(cl => cl.id === s.clientId)
+    );
+    return JSON.stringify({
+      formatId: 'park_manager_clients',
+      version: 1,
+      createdAt: new Date().toISOString(),
+      data: { clients, cars, subscriptions },
+    });
+  }, [data.clients, data.cars, data.subscriptions]);
+
+  const importClientsJson = useCallback((jsonString: string): { success: boolean; error?: string; imported?: number; skipped?: number } => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (parsed.formatId !== 'park_manager_clients') {
+        return { success: false, error: 'Неверный формат файла. Ожидается файл экспорта клиентов.' };
+      }
+      const importData = parsed.data as { clients: Client[]; cars: Car[]; subscriptions?: typeof data.subscriptions };
+      if (!importData?.clients || !Array.isArray(importData.clients)) {
+        return { success: false, error: 'Файл не содержит данных клиентов.' };
+      }
+
+      let imported = 0;
+      let skipped = 0;
+      const existingPhones = new Set(data.clients.filter(c => !c.deleted).map(c => c.phone));
+      const existingPlates = new Set(data.cars.filter(c => !c.deleted).map(c => c.plateNumber.toUpperCase()));
+
+      const newClients: Client[] = [];
+      const newCars: Car[] = [];
+      const idMap = new Map<string, string>();
+
+      for (const client of importData.clients) {
+        if (client.deleted) { skipped++; continue; }
+        if (existingPhones.has(client.phone)) {
+          skipped++;
+          idMap.set(client.id, '');
+          continue;
+        }
+        const newId = generateId();
+        idMap.set(client.id, newId);
+        newClients.push({ ...client, id: newId, createdAt: client.createdAt ?? new Date().toISOString() });
+        existingPhones.add(client.phone);
+        imported++;
+      }
+
+      if (importData.cars && Array.isArray(importData.cars)) {
+        for (const car of importData.cars) {
+          if (car.deleted) continue;
+          const newClientId = idMap.get(car.clientId);
+          if (!newClientId) continue;
+          if (existingPlates.has(car.plateNumber.toUpperCase())) continue;
+          newCars.push({ ...car, id: generateId(), clientId: newClientId });
+          existingPlates.add(car.plateNumber.toUpperCase());
+        }
+      }
+
+      let newSubs: typeof data.subscriptions = [];
+      if (importData.subscriptions && Array.isArray(importData.subscriptions)) {
+        for (const sub of importData.subscriptions) {
+          const newClientId = idMap.get(sub.clientId);
+          if (!newClientId) continue;
+          const newCarId = newCars.find(c => c.clientId === newClientId)?.id;
+          if (!newCarId) continue;
+          newSubs.push({ ...sub, id: generateId(), clientId: newClientId, carId: newCarId });
+        }
+      }
+
+      if (newClients.length === 0) {
+        return { success: true, imported: 0, skipped };
+      }
+
+      update(prev => ({
+        ...prev,
+        clients: [...prev.clients, ...newClients],
+        cars: [...prev.cars, ...newCars],
+        subscriptions: [...prev.subscriptions, ...newSubs],
+      }));
+
+      logAction('clients_import', 'Импорт клиентов', `Импортировано: ${imported}, пропущено: ${skipped}`);
+      console.log(`[Parking] Imported ${imported} clients, ${newCars.length} cars, skipped ${skipped}`);
+      return { success: true, imported, skipped };
+    } catch (e) {
+      console.log('[Parking] Import clients error:', e);
+      return { success: false, error: 'Ошибка чтения файла' };
+    }
+  }, [data.clients, data.cars, update, logAction]);
+
   const saveCleanupChecklist = useCallback((shiftId: string, checklist: CleanupChecklistItem[]) => {
     update(prev => ({
       ...prev,
@@ -2476,6 +2566,8 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     adminForceCloseShift,
     applyHealing,
     restoreBackup,
+    exportClientsJson,
+    importClientsJson,
     syncStatus,
   }), [
     data, isLoaded, currentShift, needsShiftCheck, syncStatus,
@@ -2494,6 +2586,6 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     addManualDebt, deleteDebt, addExpenseCategory, deleteExpenseCategory, activeExpenseCategories,
     logLogin, addSessionNote, getSessionNotes, getSessionAccrualTotal,
     adminForceCloseShift,
-    createBackup, restoreBackup, applyHealing,
+    createBackup, restoreBackup, applyHealing, exportClientsJson, importClientsJson,
   ]);
 });
