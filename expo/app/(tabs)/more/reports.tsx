@@ -3,15 +3,15 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
 } from 'react-native';
 import {
-  Banknote, CreditCard, TrendingUp, Car, AlertTriangle, Clock, Users,
+  Banknote, CreditCard, TrendingUp, Car, AlertTriangle, Clock, Users, ParkingSquare,
 } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
-import { formatMoney, formatDateTime, formatDate, daysUntil } from '@/utils/helpers';
+import { formatMoney, formatDateTime, formatDate, daysUntil, getServiceTypeLabel } from '@/utils/helpers';
 import BarChart from '@/components/BarChart';
 
-type Tab = 'revenue' | 'shifts' | 'auto' | 'operators' | 'debts' | 'expiring';
+type Tab = 'revenue' | 'shifts' | 'auto' | 'operators' | 'debts' | 'expiring' | 'occupancy';
 type Period = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
 export default function ReportsScreen() {
@@ -19,6 +19,7 @@ export default function ReportsScreen() {
   const {
     transactions, expenses, shifts, sessions, payments,
     activeCars, activeClients, debtors, expiringSubscriptions,
+    dailyOccupancySnapshots,
   } = useParking();
 
   const [tab, setTab] = useState<Tab>('revenue');
@@ -236,11 +237,43 @@ export default function ReportsScreen() {
     return Array.from(opMap.values()).sort((a, b) => b.checkins - a.checkins);
   }, [sessions, transactions, payments, periodFilter]);
 
+  const [expandedSnapshotId, setExpandedSnapshotId] = useState<string | null>(null);
+
+  const occupancySnapshots = useMemo(() => {
+    return [...dailyOccupancySnapshots].sort((a, b) => b.date.localeCompare(a.date));
+  }, [dailyOccupancySnapshots]);
+
+  const occupancyChartData = useMemo(() => {
+    const last14 = [...dailyOccupancySnapshots]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-14);
+    return last14.map(s => {
+      const d = new Date(s.date);
+      return {
+        label: `${d.getDate()}.${d.getMonth() + 1}`,
+        value: s.totalCars,
+        color: colors.info,
+      };
+    });
+  }, [dailyOccupancySnapshots, colors.info]);
+
+  const avgOccupancy = useMemo(() => {
+    if (occupancySnapshots.length === 0) return 0;
+    const total = occupancySnapshots.reduce((s, snap) => s + snap.totalCars, 0);
+    return Math.round(total / occupancySnapshots.length * 10) / 10;
+  }, [occupancySnapshots]);
+
+  const maxOccupancy = useMemo(() => {
+    if (occupancySnapshots.length === 0) return 0;
+    return Math.max(...occupancySnapshots.map(s => s.totalCars));
+  }, [occupancySnapshots]);
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'revenue', label: 'Выручка' },
     { key: 'shifts', label: 'Смены' },
     { key: 'auto', label: 'Авто' },
     { key: 'operators', label: 'Операторы' },
+    { key: 'occupancy', label: '04:00' },
     { key: 'debts', label: 'Долги' },
     { key: 'expiring', label: 'Истекают' },
   ];
@@ -516,6 +549,94 @@ export default function ReportsScreen() {
           </>
         )}
 
+        {tab === 'occupancy' && (
+          <>
+            <View style={styles.occupancyHeader}>
+              <ParkingSquare size={22} color={colors.info} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.occupancyTitle}>Фактическая загрузка (04:00)</Text>
+                <Text style={styles.occupancySubtitle}>Снимок всех авто на парковке в 04:00</Text>
+              </View>
+            </View>
+
+            {occupancyChartData.length > 1 && (
+              <BarChart
+                title="Авто на парковке (04:00)"
+                data={occupancyChartData}
+                formatValue={(v) => String(v)}
+              />
+            )}
+
+            <View style={styles.occupancyStatsRow}>
+              <View style={styles.occupancyStatCard}>
+                <Text style={styles.occupancyStatValue}>{occupancySnapshots.length}</Text>
+                <Text style={styles.occupancyStatLabel}>дней</Text>
+              </View>
+              <View style={styles.occupancyStatCard}>
+                <Text style={styles.occupancyStatValue}>{avgOccupancy}</Text>
+                <Text style={styles.occupancyStatLabel}>среднее</Text>
+              </View>
+              <View style={styles.occupancyStatCard}>
+                <Text style={styles.occupancyStatValue}>{maxOccupancy}</Text>
+                <Text style={styles.occupancyStatLabel}>макс.</Text>
+              </View>
+            </View>
+
+            {occupancySnapshots.map(snap => {
+              const isExpanded = expandedSnapshotId === snap.id;
+              return (
+                <TouchableOpacity
+                  key={snap.id}
+                  style={styles.snapshotCard}
+                  onPress={() => setExpandedSnapshotId(isExpanded ? null : snap.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.snapshotHeader}>
+                    <View style={styles.snapshotDateBlock}>
+                      <Text style={styles.snapshotDate}>{formatDate(snap.date)}</Text>
+                      <Text style={styles.snapshotTime}>04:00</Text>
+                    </View>
+                    <View style={styles.snapshotCountBadge}>
+                      <Car size={14} color={colors.white} />
+                      <Text style={styles.snapshotCountText}>{snap.totalCars}</Text>
+                    </View>
+                  </View>
+
+                  {isExpanded && snap.cars.length > 0 && (
+                    <View style={styles.snapshotCarsContainer}>
+                      <View style={styles.snapshotDivider} />
+                      {snap.cars
+                        .sort((a, b) => b.daysParked - a.daysParked)
+                        .map((car, idx) => (
+                        <View key={`${car.carId}-${idx}`} style={styles.snapshotCarRow}>
+                          <View style={styles.snapshotCarInfo}>
+                            <Text style={styles.snapshotCarPlate}>{car.plateNumber}</Text>
+                            <Text style={styles.snapshotCarClient} numberOfLines={1}>{car.clientName}</Text>
+                          </View>
+                          <View style={styles.snapshotCarMeta}>
+                            <Text style={styles.snapshotCarType}>{getServiceTypeLabel(car.serviceType)}</Text>
+                            <Text style={styles.snapshotCarDays}>{car.daysParked} сут.</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {isExpanded && snap.cars.length === 0 && (
+                    <View style={styles.snapshotCarsContainer}>
+                      <View style={styles.snapshotDivider} />
+                      <Text style={styles.snapshotEmpty}>Парковка была пуста</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            {occupancySnapshots.length === 0 && (
+              <Text style={styles.emptyText}>Нет данных. Отчёт формируется ежедневно в 04:00</Text>
+            )}
+          </>
+        )}
+
         {tab === 'debts' && (
           <>
             <View style={styles.debtSummary}>
@@ -738,4 +859,48 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   operatorMoneyTotal: {
     borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, marginTop: 2,
   },
+  occupancyHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginBottom: 16,
+  },
+  occupancyTitle: { fontSize: 16, fontWeight: '700' as const, color: colors.text },
+  occupancySubtitle: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
+  occupancyStatsRow: {
+    flexDirection: 'row', gap: 8, marginBottom: 16,
+  },
+  occupancyStatCard: {
+    flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 14,
+    alignItems: 'center', borderWidth: 1, borderColor: colors.border,
+  },
+  occupancyStatValue: { fontSize: 22, fontWeight: '800' as const, color: colors.info },
+  occupancyStatLabel: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
+  snapshotCard: {
+    backgroundColor: colors.surface, borderRadius: 12, padding: 14,
+    marginBottom: 8, borderWidth: 1, borderColor: colors.border,
+  },
+  snapshotHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  snapshotDateBlock: { gap: 2 },
+  snapshotDate: { fontSize: 14, fontWeight: '600' as const, color: colors.text },
+  snapshotTime: { fontSize: 11, color: colors.textTertiary },
+  snapshotCountBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.info, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  snapshotCountText: { fontSize: 15, fontWeight: '700' as const, color: colors.white },
+  snapshotCarsContainer: { marginTop: 10 },
+  snapshotDivider: { height: 1, backgroundColor: colors.border, marginBottom: 10 },
+  snapshotCarRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border + '40',
+  },
+  snapshotCarInfo: { flex: 1 },
+  snapshotCarPlate: { fontSize: 13, fontWeight: '700' as const, color: colors.text },
+  snapshotCarClient: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  snapshotCarMeta: { alignItems: 'flex-end' },
+  snapshotCarType: { fontSize: 11, color: colors.textTertiary },
+  snapshotCarDays: { fontSize: 13, fontWeight: '700' as const, color: colors.primary, marginTop: 1 },
+  snapshotEmpty: { fontSize: 12, color: colors.textTertiary, textAlign: 'center' as const, paddingVertical: 8 },
 });

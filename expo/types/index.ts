@@ -354,6 +354,23 @@ export interface SessionNote {
   type: 'checkin' | 'checkout' | 'general';
 }
 
+export interface DailyOccupancySnapshot {
+  id: string;
+  date: string;
+  snapshotTime: string;
+  cars: {
+    carId: string;
+    clientId: string;
+    plateNumber: string;
+    clientName: string;
+    sessionId: string;
+    serviceType: ServiceType;
+    entryTime: string;
+    daysParked: number;
+  }[];
+  totalCars: number;
+}
+
 export interface AnomalyLogEntry {
   id: string;
   timestamp: string;
@@ -407,4 +424,5 @@ export interface AppData {
   editHistory: ClientEditHistoryEntry[];
   loginLogs: LoginLogEntry[];
   sessionNotes: SessionNote[];
+  dailyOccupancySnapshots: DailyOccupancySnapshot[];
 }

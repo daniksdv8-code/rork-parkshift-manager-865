@@ -16,7 +16,7 @@ import {
   CleanupTemplateItem, CleanupChecklistItem,
   ScheduledShift, TeamViolationMonth, ViolationEntry,
   ExpenseCategory, ClientEditHistoryEntry,
-  LoginLogEntry, SessionNote,
+  LoginLogEntry, SessionNote, DailyOccupancySnapshot,
 } from '@/types';
 
 const STORAGE_KEY = 'park_data';
@@ -56,6 +56,7 @@ function createEmptyData(): AppData {
     editHistory: [],
     loginLogs: [],
     sessionNotes: [],
+    dailyOccupancySnapshots: [],
   };
 }
 
@@ -2004,16 +2005,98 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     });
   }, [update]);
 
+  const runOccupancySnapshot = useCallback(() => {
+    update(prev => {
+      const now = new Date();
+      const todayDateStr = now.toISOString().split('T')[0];
+
+      const lastSnapshot = prev.dailyOccupancySnapshots.length > 0
+        ? prev.dailyOccupancySnapshots[prev.dailyOccupancySnapshots.length - 1]
+        : null;
+
+      const missedDates: string[] = [];
+      if (lastSnapshot) {
+        const lastDate = new Date(lastSnapshot.date);
+        lastDate.setDate(lastDate.getDate() + 1);
+        while (lastDate.toISOString().split('T')[0] < todayDateStr) {
+          missedDates.push(lastDate.toISOString().split('T')[0]);
+          lastDate.setDate(lastDate.getDate() + 1);
+        }
+      }
+
+      const alreadyHasToday = prev.dailyOccupancySnapshots.some(s => s.date === todayDateStr);
+      const shouldSnapshotToday = now.getHours() >= 4 && !alreadyHasToday;
+
+      if (!shouldSnapshotToday && missedDates.length === 0) return prev;
+
+      const activeCarsNow = prev.sessions.filter(
+        s => ['active', 'active_debt'].includes(s.status) && !s.exitTime && !s.cancelled
+      );
+
+      const buildSnapshot = (dateStr: string, snapshotTime: string): DailyOccupancySnapshot => {
+        const snapshotDate = new Date(dateStr + 'T04:00:00');
+        const carsOnDate = activeCarsNow.filter(s => new Date(s.entryTime) <= snapshotDate);
+
+        return {
+          id: generateId(),
+          date: dateStr,
+          snapshotTime,
+          cars: carsOnDate.map(s => {
+            const car = prev.cars.find(c => c.id === s.carId);
+            const client = prev.clients.find(c => c.id === s.clientId);
+            const entryDate = new Date(s.entryTime);
+            const diffMs = snapshotDate.getTime() - entryDate.getTime();
+            const daysParked = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+            return {
+              carId: s.carId,
+              clientId: s.clientId,
+              plateNumber: car?.plateNumber ?? '???',
+              clientName: client?.name ?? 'Неизвестный',
+              sessionId: s.id,
+              serviceType: s.serviceType,
+              entryTime: s.entryTime,
+              daysParked,
+            };
+          }),
+          totalCars: carsOnDate.length,
+        };
+      };
+
+      const newSnapshots: DailyOccupancySnapshot[] = [];
+
+      for (const missedDate of missedDates) {
+        newSnapshots.push(buildSnapshot(missedDate, missedDate + 'T04:00:00.000Z'));
+      }
+
+      if (shouldSnapshotToday) {
+        newSnapshots.push(buildSnapshot(todayDateStr, now.toISOString()));
+      }
+
+      if (newSnapshots.length === 0) return prev;
+
+      console.log(`[OccupancySnapshot] Generated ${newSnapshots.length} snapshot(s), latest: ${newSnapshots[newSnapshots.length - 1].date}, cars: ${newSnapshots[newSnapshots.length - 1].totalCars}`);
+
+      return {
+        ...prev,
+        dailyOccupancySnapshots: [...prev.dailyOccupancySnapshots, ...newSnapshots].slice(-365),
+      };
+    });
+  }, [update]);
+
   const runDebtAccrualRef = useRef(runDebtAccrual);
+  const runOccupancySnapshotRef = useRef(runOccupancySnapshot);
   useEffect(() => {
     runDebtAccrualRef.current = runDebtAccrual;
-  }, [runDebtAccrual]);
+    runOccupancySnapshotRef.current = runOccupancySnapshot;
+  }, [runDebtAccrual, runOccupancySnapshot]);
 
   useEffect(() => {
     if (!isLoaded) return;
     runDebtAccrualRef.current();
+    runOccupancySnapshotRef.current();
     const interval = setInterval(() => {
       runDebtAccrualRef.current();
+      runOccupancySnapshotRef.current();
     }, 60000);
     return () => clearInterval(interval);
   }, [isLoaded]);
