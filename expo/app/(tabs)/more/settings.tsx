@@ -369,7 +369,7 @@ export default function SettingsScreen() {
       <View style={[styles.section, styles.dangerSection]}>
         <Text style={[styles.sectionTitle, { color: colors.danger }]}>Опасная зона</Text>
         <Text style={styles.dangerDesc}>
-          Введите СБРОС для удаления всех данных. Тарифы и аккаунт администратора сохранятся.
+          Введите СБРОС для очистки операционных данных. Сохранятся: клиенты, авто, менеджеры, тарифы и настройки. Будут удалены: история касс, смены, отчёты, долги, оплаты, сессии.
         </Text>
         <TextInput
           style={[styles.formInput, { borderColor: colors.danger + '30' }]}

@@ -2432,14 +2432,20 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
   }, [update]);
 
   const resetAllData = useCallback(() => {
-    const adminUser = data.users.find(u => u.role === 'admin');
     const fresh = createEmptyData();
-    if (adminUser) fresh.users = [adminUser];
+    fresh.users = data.users;
     fresh.tariffs = data.tariffs;
+    fresh.clients = data.clients;
+    fresh.cars = data.cars;
+    fresh.expenseCategories = data.expenseCategories;
+    fresh.cleanupChecklistTemplate = data.cleanupChecklistTemplate;
+    fresh.subscriptions = [];
+    fresh.clientDebts = [];
+    fresh.debts = [];
     setData(fresh);
     persist(fresh);
-    logAction('data_reset', 'Сброс данных', 'Все данные удалены');
-  }, [data.users, data.tariffs, persist, logAction]);
+    console.log('[ResetData] Data reset. Preserved: clients, cars, users, tariffs, admin settings');
+  }, [data.users, data.tariffs, data.clients, data.cars, data.expenseCategories, data.cleanupChecklistTemplate, persist]);
 
   const logLogin = useCallback((user: User) => {
     const entry: LoginLogEntry = {
