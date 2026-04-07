@@ -157,7 +157,12 @@ export default function ExitModal() {
         <Car size={24} color={colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={styles.plate} numberOfLines={1}>{car?.plateNumber ?? '???'}</Text>
-          <Text style={styles.clientName} numberOfLines={1}>{client?.name ?? 'Неизвестный'}</Text>
+          <TouchableOpacity
+            onPress={() => { if (session?.clientId) router.push({ pathname: '/client-card', params: { clientId: session.clientId } }); }}
+            activeOpacity={0.6}
+          >
+            <Text style={styles.clientNameLink} numberOfLines={1}>{client?.name ?? 'Неизвестный'}</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.typeBadge}>
           <Text style={styles.typeBadgeText}>{getServiceTypeLabel(session.serviceType)}</Text>
@@ -355,6 +360,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   plate: { fontSize: 20, fontWeight: '800' as const, color: colors.text, letterSpacing: 1 },
   clientName: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
+  clientNameLink: { fontSize: 14, color: colors.primary, marginTop: 2, textDecorationLine: 'underline' as const },
   typeBadge: {
     backgroundColor: colors.primarySurface, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
   },

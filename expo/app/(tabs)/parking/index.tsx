@@ -118,7 +118,12 @@ export default function ParkingScreen() {
         </View>
 
         <View style={styles.cardBody}>
-          <Text style={styles.clientName} numberOfLines={1}>{client?.name ?? 'Неизвестный'}</Text>
+          <TouchableOpacity
+            onPress={() => { if (session.clientId) router.push({ pathname: '/client-card', params: { clientId: session.clientId } }); }}
+            activeOpacity={0.6}
+          >
+            <Text style={styles.clientNameLink} numberOfLines={1}>{client?.name ?? 'Неизвестный'}</Text>
+          </TouchableOpacity>
           <View style={styles.infoRow}>
             <Clock size={13} color={colors.textTertiary} />
             <Text style={styles.infoText} numberOfLines={1}>{formatDateTime(session.entryTime)} · {days} сут.</Text>
@@ -244,7 +249,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   typeBadgeTextLombard: { color: colors.warning },
   typeBadgeTextDebt: { color: colors.danger },
   cardBody: { marginBottom: 12 },
-  clientName: { fontSize: 14, fontWeight: '500' as const, color: colors.text, marginBottom: 4 },
+  clientNameLink: { fontSize: 14, fontWeight: '500' as const, color: colors.primary, marginBottom: 4, textDecorationLine: 'underline' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoText: { fontSize: 12, color: colors.textTertiary },
   costText: { fontSize: 16, fontWeight: '700' as const, color: colors.primary, marginTop: 6 },

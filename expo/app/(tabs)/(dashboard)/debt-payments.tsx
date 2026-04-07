@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Wallet, CreditCard, Banknote } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
 import { formatMoney, formatDateTime, isToday } from '@/utils/helpers';
 import { Transaction } from '@/types';
+import { useRouter } from 'expo-router';
 
 export default function DebtPaymentsTodayScreen() {
+  const router = useRouter();
   const { transactions, activeClients, activeCars } = useParking();
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -27,7 +29,11 @@ export default function DebtPaymentsTodayScreen() {
     const car = activeCars.find(c => c.id === item.carId);
     const isCash = item.method === 'cash';
     return (
-      <View style={styles.row}>
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => { if (item.clientId) router.push({ pathname: '/client-card', params: { clientId: item.clientId } }); }}
+        activeOpacity={0.7}
+      >
         <View style={[styles.iconWrap, { backgroundColor: isCash ? colors.successSurface : colors.infoSurface }]}>
           {isCash ? <Banknote size={14} color={colors.cash} /> : <CreditCard size={14} color={colors.card} />}
         </View>
@@ -37,7 +43,7 @@ export default function DebtPaymentsTodayScreen() {
           <Text style={styles.meta}>{formatDateTime(item.date)} · {item.operatorName}</Text>
         </View>
         <Text style={styles.amount}>+{formatMoney(item.amount)}</Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
 } from 'react-native';
@@ -15,6 +16,7 @@ type Tab = 'revenue' | 'shifts' | 'auto' | 'operators' | 'debts' | 'expiring' | 
 type Period = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
 export default function ReportsScreen() {
+  const router = useRouter();
   const colors = useColors();
   const {
     transactions, expenses, shifts, sessions, payments,
@@ -649,13 +651,18 @@ export default function ReportsScreen() {
             {debtors.sort((a, b) => b.amount - a.amount).map(d => {
               const cars = activeCars.filter(c => c.clientId === d.clientId);
               return (
-                <View key={d.clientId} style={styles.debtorRow}>
+                <TouchableOpacity
+                  key={d.clientId}
+                  style={styles.debtorRow}
+                  onPress={() => router.push({ pathname: '/client-card', params: { clientId: d.clientId } })}
+                  activeOpacity={0.7}
+                >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.debtorName} numberOfLines={1}>{d.client?.name ?? 'Неизвестный'}</Text>
                     <Text style={styles.debtorCars} numberOfLines={1}>{cars.map(c => c.plateNumber).join(', ')}</Text>
                   </View>
                   <Text style={styles.debtorAmount}>{formatMoney(d.amount)}</Text>
-                </View>
+                </TouchableOpacity>
               );
             })}
             {debtors.length === 0 && <Text style={styles.emptyText}>Должников нет</Text>}
@@ -671,7 +678,12 @@ export default function ReportsScreen() {
             {expiringSubscriptions.map(sub => {
               const days = daysUntil(sub.paidUntil);
               return (
-                <View key={sub.id} style={styles.expiringRow}>
+                <TouchableOpacity
+                  key={sub.id}
+                  style={styles.expiringRow}
+                  onPress={() => router.push({ pathname: '/client-card', params: { clientId: sub.clientId } })}
+                  activeOpacity={0.7}
+                >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.expiringName} numberOfLines={1}>{sub.client?.name ?? 'Клиент'}</Text>
                     <Text style={styles.expiringPlate} numberOfLines={1}>{sub.car?.plateNumber ?? ''}</Text>
@@ -682,7 +694,7 @@ export default function ReportsScreen() {
                       {days <= 0 ? 'Сегодня' : `${days} дн.`}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
             {expiringSubscriptions.length === 0 && <Text style={styles.emptyText}>Нет истекающих подписок</Text>}

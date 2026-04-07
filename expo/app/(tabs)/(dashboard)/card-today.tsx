@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { CreditCard, ArrowUpRight, X as XIcon } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
 import { formatMoney, formatDateTime, isToday } from '@/utils/helpers';
 import { Transaction } from '@/types';
+import { useRouter } from 'expo-router';
 
 export default function CardTodayScreen() {
+  const router = useRouter();
   const { transactions } = useParking();
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -31,7 +33,11 @@ export default function CardTodayScreen() {
   const renderItem = ({ item }: { item: Transaction }) => {
     const isIncome = ['payment', 'debt_payment'].includes(item.type);
     return (
-      <View style={styles.row}>
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => { if (item.clientId) router.push({ pathname: '/client-card', params: { clientId: item.clientId } }); }}
+        activeOpacity={item.clientId ? 0.7 : 1}
+      >
         <View style={[styles.iconWrap, { backgroundColor: isIncome ? colors.infoSurface : colors.dangerSurface }]}>
           {isIncome ? <ArrowUpRight size={14} color={colors.info} /> : <XIcon size={14} color={colors.danger} />}
         </View>
@@ -42,7 +48,7 @@ export default function CardTodayScreen() {
         <Text style={[styles.amount, isIncome ? styles.amountBlue : styles.amountRed]}>
           {isIncome ? '+' : '-'}{formatMoney(item.amount)}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 

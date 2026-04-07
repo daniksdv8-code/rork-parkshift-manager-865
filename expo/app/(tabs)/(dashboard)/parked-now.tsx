@@ -55,7 +55,12 @@ export default function ParkedNowScreen() {
         <View style={styles.cardLeft}>
           <Text style={styles.plate}>{car?.plateNumber ?? '???'}</Text>
           {car?.carModel && <Text style={styles.model}>{car.carModel}</Text>}
-          <Text style={styles.clientName}>{client?.name ?? 'Клиент'}</Text>
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); router.push({ pathname: '/client-card', params: { clientId: item.clientId } }); }}
+            activeOpacity={0.6}
+          >
+            <Text style={styles.clientNameLink}>{client?.name ?? 'Клиент'}</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.cardRight}>
           <View style={[styles.typeBadge, { backgroundColor: (typeColors[item.serviceType] ?? colors.textSecondary) + '15' }]}>
@@ -134,7 +139,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   cardLeft: { flex: 1 },
   plate: { fontSize: 17, fontWeight: '800' as const, color: colors.text, letterSpacing: 0.5 },
   model: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  clientName: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
+  clientNameLink: { fontSize: 12, color: colors.primary, marginTop: 2, textDecorationLine: 'underline' },
   cardRight: { alignItems: 'flex-end', gap: 4 },
   typeBadge: { borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
   typeText: { fontSize: 10, fontWeight: '600' as const },

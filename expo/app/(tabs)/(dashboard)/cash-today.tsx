@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Banknote, ArrowUpRight, ArrowDownRight, X as XIcon } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
 import { formatMoney, formatDateTime, isToday } from '@/utils/helpers';
 import { Transaction } from '@/types';
+import { useRouter } from 'expo-router';
 
 export default function CashTodayScreen() {
+  const router = useRouter();
   const { transactions } = useParking();
   const colors = useColors();
 
@@ -35,7 +37,11 @@ export default function CashTodayScreen() {
     const isIncome = ['payment', 'debt_payment'].includes(item.type);
     const isCancel = item.type === 'cancel_payment';
     return (
-      <View style={styles.row}>
+      <TouchableOpacity
+        style={styles.row}
+        onPress={() => { if (item.clientId) router.push({ pathname: '/client-card', params: { clientId: item.clientId } }); }}
+        activeOpacity={item.clientId ? 0.7 : 1}
+      >
         <View style={[styles.iconWrap, { backgroundColor: isCancel ? colors.dangerSurface : isIncome ? colors.successSurface : colors.warningSurface }]}>
           {isCancel ? <XIcon size={14} color={colors.danger} /> : isIncome ? <ArrowUpRight size={14} color={colors.success} /> : <ArrowDownRight size={14} color={colors.warning} />}
         </View>
@@ -46,7 +52,7 @@ export default function CashTodayScreen() {
         <Text style={[styles.amount, isIncome ? styles.amountGreen : styles.amountRed]}>
           {isIncome ? '+' : '-'}{formatMoney(item.amount)}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 
