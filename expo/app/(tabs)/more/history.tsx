@@ -2,9 +2,10 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   ArrowUpRight, ArrowDownRight, CreditCard, X, RotateCcw,
-  ChevronLeft, ChevronRight, Filter, Check,
+  ChevronLeft, ChevronRight, Filter, Check, ChevronRight as ChevronRightSmall,
 } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
@@ -61,7 +62,8 @@ function getTransactionLabel(type: TransactionType): string {
 }
 
 export default function HistoryScreen() {
-  const { transactions, activeClients, activeCars } = useParking();
+  const { transactions, clients, cars } = useParking();
+  const router = useRouter();
   const colors = useColors();
   const [period, setPeriod] = useState<Period>('day');
   const [offset, setOffset] = useState(0);
@@ -124,35 +126,84 @@ export default function HistoryScreen() {
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  const allClientsMap = useMemo(() => {
+    const map = new Map<string, { name: string }>();
+    clients.forEach(c => map.set(c.id, { name: c.name }));
+    return map;
+  }, [clients]);
+
+  const allCarsMap = useMemo(() => {
+    const map = new Map<string, { plateNumber: string; carModel?: string }>();
+    cars.forEach(c => map.set(c.id, { plateNumber: c.plateNumber, carModel: c.carModel }));
+    return map;
+  }, [cars]);
+
+  const handleOpenClient = useCallback((clientId: string) => {
+    router.push({ pathname: '/client-card', params: { clientId } });
+  }, [router]);
+
   const renderItem = useCallback(({ item }: { item: Transaction }) => {
     const { Icon, color } = getTransactionIcon(item.type, colors);
-    const client = item.clientId ? activeClients.find(c => c.id === item.clientId) : null;
-    const car = item.carId ? activeCars.find(c => c.id === item.carId) : null;
+    const client = item.clientId ? allClientsMap.get(item.clientId) : null;
+    const car = item.carId ? allCarsMap.get(item.carId) : null;
     const isIncome = ['payment', 'debt_payment'].includes(item.type);
+    const hasClient = !!item.clientId && !!client;
 
-    return (
-      <View style={styles.txCard}>
+    const cardContent = (
+      <>
         <View style={[styles.txIcon, { backgroundColor: color + '15' }]}>
           <Icon size={16} color={color} />
         </View>
         <View style={styles.txBody}>
           <Text style={styles.txLabel} numberOfLines={1}>{getTransactionLabel(item.type)}</Text>
           <Text style={styles.txDesc} numberOfLines={1}>{item.description}</Text>
-          {client && <Text style={styles.txClient} numberOfLines={1}>{client.name}{car ? ` · ${car.plateNumber}` : ''}</Text>}
+          {car && (
+            <Text style={styles.txCar} numberOfLines={1}>
+              {car.plateNumber}{car.carModel ? ` · ${car.carModel}` : ''}
+            </Text>
+          )}
+          {client && (
+            <Text style={styles.txClient} numberOfLines={1}>
+              {client.name}
+            </Text>
+          )}
           <Text style={styles.txDate} numberOfLines={1}>
             {formatDateTime(item.date)}
             {item.method ? ` · ${getMethodLabel(item.method)}` : ''}
             {item.operatorName ? ` · ${item.operatorName}` : ''}
           </Text>
         </View>
-        {item.amount > 0 && (
-          <Text style={[styles.txAmount, isIncome ? styles.txAmountGreen : styles.txAmountRed]}>
-            {isIncome ? '+' : '-'}{formatMoney(item.amount)}
-          </Text>
-        )}
+        <View style={styles.txRight}>
+          {item.amount > 0 && (
+            <Text style={[styles.txAmount, isIncome ? styles.txAmountGreen : styles.txAmountRed]}>
+              {isIncome ? '+' : '-'}{formatMoney(item.amount)}
+            </Text>
+          )}
+          {hasClient && (
+            <ChevronRightSmall size={14} color={colors.textTertiary} style={styles.txChevron} />
+          )}
+        </View>
+      </>
+    );
+
+    if (hasClient) {
+      return (
+        <TouchableOpacity
+          style={styles.txCard}
+          activeOpacity={0.7}
+          onPress={() => handleOpenClient(item.clientId!)}
+        >
+          {cardContent}
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={styles.txCard}>
+        {cardContent}
       </View>
     );
-  }, [activeClients, activeCars, colors, styles]);
+  }, [allClientsMap, allCarsMap, colors, styles, handleOpenClient]);
 
   const resetFilters = useCallback(() => {
     setFilterType('all');
@@ -366,9 +417,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   txBody: { flex: 1 },
   txLabel: { fontSize: 13, fontWeight: '600' as const, color: colors.text },
   txDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
-  txClient: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
+  txCar: { fontSize: 12, color: colors.text, marginTop: 2, fontWeight: '500' as const },
+  txClient: { fontSize: 11, color: colors.primary, marginTop: 1 },
   txDate: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
-  txAmount: { fontSize: 14, fontWeight: '700' as const, flexShrink: 0, marginLeft: 6 },
+  txRight: { alignItems: 'flex-end' as const, marginLeft: 6, flexShrink: 0 },
+  txChevron: { marginTop: 4 },
+  txAmount: { fontSize: 14, fontWeight: '700' as const },
   txAmountGreen: { color: colors.success },
   txAmountRed: { color: colors.danger },
   empty: { alignItems: 'center', paddingTop: 60 },
