@@ -223,7 +223,7 @@ export default function DashboardScreen() {
     { label: 'На парковке', value: `${todayStats.parkedNow}`, icon: Car, color: colors.primary, route: '/parked-now' },
     { label: 'Наличные', value: formatMoney(todayStats.cashToday), icon: Banknote, color: colors.cash, route: '/cash-today' },
     { label: 'Безнал', value: formatMoney(todayStats.cardToday), icon: CreditCard, color: colors.card, route: '/card-today' },
-    { label: 'Должники', value: `${todayStats.debtorsCount}`, icon: AlertTriangle, color: colors.danger, route: '/more/debtors' },
+    { label: 'Должники', value: `${todayStats.debtorsCount}`, icon: AlertTriangle, color: colors.danger, route: '/debtors-screen' },
   ], [todayStats, colors]);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -320,7 +320,7 @@ export default function DashboardScreen() {
           <View style={styles.shiftActiveTop}>
             <Shield size={16} color={colors.primary} />
             <Text style={styles.shiftActiveText} numberOfLines={1}>Смена открыта · {currentShift.operatorName}</Text>
-            <TouchableOpacity onPress={() => router.push('/more/cashregister')}>
+            <TouchableOpacity onPress={() => router.push('/cashregister-screen')}>
               <Text style={styles.shiftActiveLink}>Касса</Text>
             </TouchableOpacity>
           </View>
@@ -334,7 +334,7 @@ export default function DashboardScreen() {
       )}
 
       {totalCashData && (
-        <TouchableOpacity style={styles.totalCashCard} onPress={() => router.push('/more/totalcash' as never)} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.totalCashCard} onPress={() => router.push('/totalcash-screen' as never)} activeOpacity={0.7}>
           <View style={styles.totalCashHeader}>
             <View style={styles.totalCashIconWrap}><Wallet size={22} color="#fff" /></View>
             <View style={{ flex: 1 }}>
@@ -382,7 +382,7 @@ export default function DashboardScreen() {
       )}
 
       {todayStats.totalDebt > 0 && (
-        <TouchableOpacity style={styles.debtSummaryCard} onPress={() => router.push('/more/debtors')} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.debtSummaryCard} onPress={() => router.push('/debtors-screen')} activeOpacity={0.7}>
           <View style={styles.debtSummaryRow}>
             <Wallet size={18} color={colors.danger} />
             <Text style={styles.debtSummaryLabel}>Общий долг</Text>
@@ -401,9 +401,9 @@ export default function DashboardScreen() {
         <View style={styles.quickGrid}>
           {[
             { label: 'Новый клиент', icon: UserPlus, route: '/add-client-modal' },
-            { label: 'Касса', icon: Wallet, route: '/more/cashregister' },
-            { label: 'Должники', icon: AlertTriangle, route: '/more/debtors' },
-            { label: 'История', icon: Clock, route: '/more/history' },
+            { label: 'Касса', icon: Wallet, route: '/cashregister-screen' },
+            { label: 'Должники', icon: AlertTriangle, route: '/debtors-screen' },
+            { label: 'История', icon: Clock, route: '/history-screen' },
           ].map((item, i) => (
             <TouchableOpacity key={i} style={styles.quickBtn} onPress={() => router.push(item.route as never)}>
               <item.icon size={20} color={colors.primary} />
@@ -417,7 +417,7 @@ export default function DashboardScreen() {
         const vm = getCurrentViolationMonth;
         const vColor = vm.status === 'bonus_denied' ? colors.danger : vm.status === 'warning' ? colors.warning : colors.success;
         return (
-          <TouchableOpacity style={[styles.violationCard, { borderColor: vColor + '30' }]} onPress={() => router.push('/more/violations' as never)} activeOpacity={0.7}>
+          <TouchableOpacity style={[styles.violationCard, { borderColor: vColor + '30' }]} onPress={() => router.push('/violations-screen' as never)} activeOpacity={0.7}>
             <Shield size={20} color={vColor} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.violationTitle, { color: vColor }]} numberOfLines={1}>

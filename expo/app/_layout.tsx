@@ -34,6 +34,11 @@ function RootLayoutNav() {
       <Stack.Screen name="add-violation-modal" options={{ title: "Новое нарушение", presentation: "modal" }} />
       <Stack.Screen name="checkin-modal" options={{ title: "Оформить заезд", presentation: "modal" }} />
       <Stack.Screen name="global-search" options={{ title: "Поиск", presentation: "modal" }} />
+      <Stack.Screen name="debtors-screen" options={{ title: "Должники" }} />
+      <Stack.Screen name="cashregister-screen" options={{ title: "Касса" }} />
+      <Stack.Screen name="history-screen" options={{ title: "История" }} />
+      <Stack.Screen name="totalcash-screen" options={{ title: "Общая касса" }} />
+      <Stack.Screen name="violations-screen" options={{ title: "Нарушения" }} />
     </Stack>
   );
 }
