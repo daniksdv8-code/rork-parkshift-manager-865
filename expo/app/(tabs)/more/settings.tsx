@@ -6,6 +6,7 @@ import { Save, UserPlus, Trash2, Lock, Shield, Download, Upload, User, Key, File
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { Platform } from 'react-native';
+import { File as ExpoFile } from 'expo-file-system';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
@@ -106,30 +107,36 @@ export default function SettingsScreen() {
       if (Platform.OS === 'web') {
         if ((asset as any).file) {
           text = await (asset as any).file.text();
+          console.log('[Settings] Read via web File object, length:', text?.length);
         } else if (asset.uri) {
           const response = await fetch(asset.uri);
           text = await response.text();
+          console.log('[Settings] Read via web fetch, length:', text?.length);
         }
       } else {
         try {
-          const { File: ExpoFile } = require('expo-file-system');
           const file = new ExpoFile(asset.uri);
+          console.log('[Settings] ExpoFile created, exists:', file.exists, 'size:', file.size, 'uri:', file.uri);
           text = await file.text();
-          console.log('[Settings] Read via new File API, length:', text?.length);
-        } catch (fsError: any) {
-          console.log('[Settings] New File API failed, trying legacy:', fsError?.message);
-          try {
-            const FileSystemLegacy = require('expo-file-system/legacy');
-            text = await FileSystemLegacy.readAsStringAsync(asset.uri, {
-              encoding: FileSystemLegacy.EncodingType.UTF8,
-            });
-            console.log('[Settings] Read via legacy API, length:', text?.length);
-          } catch (legacyError: any) {
-            console.log('[Settings] Legacy API failed, trying fetch:', legacyError?.message);
-            const response = await fetch(asset.uri);
-            text = await response.text();
-            console.log('[Settings] Read via fetch, length:', text?.length);
-          }
+          console.log('[Settings] Read via ExpoFile(uri), length:', text?.length);
+        } catch (err1: any) {
+          console.log('[Settings] ExpoFile(uri) failed:', err1?.message);
+            try {
+              const FileSystemLegacy = require('expo-file-system/legacy');
+              text = await FileSystemLegacy.readAsStringAsync(asset.uri, {
+                encoding: FileSystemLegacy.EncodingType.UTF8,
+              });
+              console.log('[Settings] Read via legacy API, length:', text?.length);
+            } catch (err2: any) {
+              console.log('[Settings] Legacy API failed:', err2?.message);
+              try {
+                const response = await fetch(asset.uri);
+                text = await response.text();
+                console.log('[Settings] Read via fetch fallback, length:', text?.length);
+              } catch (err3: any) {
+                console.log('[Settings] All read methods failed:', err3?.message);
+              }
+            }
         }
       }
 
