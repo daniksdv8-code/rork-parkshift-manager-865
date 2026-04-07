@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, UserPlus, Car, AlertTriangle, X } from 'lucide-react-native';
+import { Search, UserPlus, Car, AlertTriangle, X, Phone } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
@@ -88,6 +88,14 @@ export default function ClientsScreen() {
               </View>
             )}
           </View>
+          <TouchableOpacity
+            style={styles.phoneRow}
+            onPress={(e) => { e.stopPropagation(); void Linking.openURL(`tel:${client.phone}`); }}
+            activeOpacity={0.6}
+          >
+            <Phone size={11} color={colors.primary} />
+            <Text style={styles.phoneText} numberOfLines={1}>{client.phone}</Text>
+          </TouchableOpacity>
           {cars.length > 0 && (
             <Text style={styles.carsText} numberOfLines={1}>
               {cars.map(c => `${c.plateNumber}${c.carModel ? ` ${c.carModel}` : ''}`).join(', ')}
@@ -224,6 +232,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   carsText: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   debtRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   debtText: { fontSize: 12, color: colors.danger, fontWeight: '500' as const },
+  phoneRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, marginTop: 2 },
+  phoneText: { fontSize: 12, color: colors.primary, fontWeight: '500' as const },
   empty: { alignItems: 'center', paddingTop: 60 },
   emptyText: { fontSize: 15, color: colors.textTertiary },
 });

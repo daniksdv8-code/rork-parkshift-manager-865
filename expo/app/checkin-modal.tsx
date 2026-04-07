@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert,
+  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Linking,
 } from 'react-native';
 import {
   Car, Banknote, CreditCard, FileEdit,
@@ -145,7 +145,9 @@ export default function CheckinModalScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.clientName}>{client.name}</Text>
-            <Text style={styles.clientPhone}>{client.phone}</Text>
+            <TouchableOpacity onPress={() => Linking.openURL(`tel:${client.phone}`)}>
+              <Text style={[styles.clientPhone, { color: colors.primary }]}>{client.phone}</Text>
+            </TouchableOpacity>
           </View>
         </View>
         <View style={styles.emptyState}>
@@ -165,7 +167,9 @@ export default function CheckinModalScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.clientName} numberOfLines={1}>{client.name}</Text>
-          <Text style={styles.clientPhone} numberOfLines={1}>{client.phone}</Text>
+          <TouchableOpacity onPress={() => Linking.openURL(`tel:${client.phone}`)}>
+            <Text style={[styles.clientPhone, { color: colors.primary }]} numberOfLines={1}>{client.phone}</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

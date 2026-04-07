@@ -120,9 +120,10 @@ export default function ClientCardScreen() {
       .slice(0, 30),
   [editHistory, clientId]);
 
-  const handleCall = useCallback(() => {
-    if (client?.phone) {
-      void Linking.openURL(`tel:${client.phone}`);
+  const handleCall = useCallback((phoneNumber?: string) => {
+    const num = phoneNumber || client?.phone;
+    if (num) {
+      void Linking.openURL(`tel:${num}`);
     }
   }, [client]);
 
@@ -281,12 +282,15 @@ export default function ClientCardScreen() {
             ) : (
               <>
                 <Text style={styles.profileName}>{client.name}</Text>
-                <TouchableOpacity onPress={handleCall} style={styles.phoneRow}>
+                <TouchableOpacity onPress={() => handleCall(client.phone)} style={styles.phoneRow}>
                   <Phone size={14} color={colors.primary} />
                   <Text style={styles.phoneText}>{client.phone}</Text>
                 </TouchableOpacity>
                 {client.phone2 && (
-                  <Text style={styles.phone2Text}>доп. {client.phone2}</Text>
+                  <TouchableOpacity onPress={() => handleCall(client.phone2)} style={styles.phoneRow}>
+                    <Phone size={12} color={colors.textTertiary} />
+                    <Text style={styles.phone2Text}>доп. {client.phone2}</Text>
+                  </TouchableOpacity>
                 )}
               </>
             )}
