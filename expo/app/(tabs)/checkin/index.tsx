@@ -157,18 +157,20 @@ export default function CheckinScreen() {
       ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       : undefined;
 
+    const isLombard = serviceType === 'lombard';
+
     const result = checkIn({
       carId,
       clientId,
       serviceType,
-      paymentMethod: inDebt ? undefined : paymentMethod,
-      paymentAmount: inDebt ? 0 : finalAmount,
-      inDebt,
-      debtAmount: inDebt ? finalAmount : undefined,
+      paymentMethod: isLombard ? undefined : (inDebt ? undefined : paymentMethod),
+      paymentAmount: isLombard ? 0 : (inDebt ? 0 : finalAmount),
+      inDebt: isLombard ? false : inDebt,
+      debtAmount: isLombard ? undefined : (inDebt ? finalAmount : undefined),
       plannedDays: d,
       paidUntilDate,
-      baseAmount: customAmountEnabled ? baseAmount : undefined,
-      adjustmentReason: customAmountEnabled && adjustmentReason ? adjustmentReason : undefined,
+      baseAmount: isLombard ? undefined : (customAmountEnabled ? baseAmount : undefined),
+      adjustmentReason: isLombard ? undefined : (customAmountEnabled && adjustmentReason ? adjustmentReason : undefined),
     });
 
     if (result) {
