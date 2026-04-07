@@ -50,6 +50,9 @@ export default function CheckinModalScreen() {
   const [adjustmentReason, setAdjustmentReason] = useState('');
   const [plannedDeparture, setPlannedDeparture] = useState('');
   const [sessionNote, setSessionNote] = useState('');
+  const [lombardPrepay, setLombardPrepay] = useState(false);
+  const [lombardPrepayAmount, setLombardPrepayAmount] = useState('');
+  const [lombardPrepayMethod, setLombardPrepayMethod] = useState<PaymentMethod>('cash');
 
   const baseAmount = useMemo(() => {
     const d = parseInt(days) || 1;
@@ -100,10 +103,15 @@ export default function CheckinModalScreen() {
       carId: selectedCarId,
       clientId,
       serviceType,
-      paymentMethod: (inDebt || serviceType === 'lombard') ? undefined : paymentMethod,
-      paymentAmount: (inDebt || serviceType === 'lombard') ? 0 : finalAmount,
+      paymentMethod: serviceType === 'lombard'
+        ? (lombardPrepay ? lombardPrepayMethod : undefined)
+        : (inDebt ? undefined : paymentMethod),
+      paymentAmount: serviceType === 'lombard'
+        ? (lombardPrepay ? (parseInt(lombardPrepayAmount) || 0) : 0)
+        : (inDebt ? 0 : finalAmount),
       inDebt,
       debtAmount: inDebt ? finalAmount : undefined,
+      lombardPrepayment: serviceType === 'lombard' && lombardPrepay ? (parseInt(lombardPrepayAmount) || 0) : undefined,
       plannedDays: d,
       paidUntilDate,
       baseAmount: customAmountEnabled ? baseAmount : undefined,
@@ -126,6 +134,7 @@ export default function CheckinModalScreen() {
     currentUser, needsShiftCheck, selectedCarId, clientId,
     activeSessions, serviceType, paymentMethod, inDebt, finalAmount, baseAmount,
     days, checkIn, customAmountEnabled, adjustmentReason, sessionNote, addSessionNote, router,
+    lombardPrepay, lombardPrepayAmount, lombardPrepayMethod,
   ]);
 
   if (!client) {
@@ -213,12 +222,58 @@ export default function CheckinModalScreen() {
       </View>
 
       {serviceType === 'lombard' && (
-        <View style={styles.lombardInfo}>
-          <AlertTriangle size={14} color={colors.warning} />
-          <Text style={styles.lombardInfoText}>
-            Ломбард: {formatMoney(tariffs.lombardRate)}/сут. Долг начисляется ежедневно.
-          </Text>
-        </View>
+        <>
+          <View style={styles.lombardInfo}>
+            <AlertTriangle size={14} color={colors.warning} />
+            <Text style={styles.lombardInfoText}>
+              Ломбард: {formatMoney(tariffs.lombardRate)}/сут. Долг начисляется ежедневно.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.debtToggle, lombardPrepay && { backgroundColor: colors.primarySurface, borderColor: colors.primary + '30' }]}
+            onPress={() => setLombardPrepay(!lombardPrepay)}
+          >
+            {lombardPrepay && <Check size={16} color={colors.primary} />}
+            <Banknote size={16} color={lombardPrepay ? colors.primary : colors.textTertiary} />
+            <Text style={[styles.debtToggleText, lombardPrepay && { color: colors.primary }]}>
+              Предоплата
+            </Text>
+          </TouchableOpacity>
+
+          {lombardPrepay && (
+            <View style={styles.lombardPrepayForm}>
+              <Text style={styles.sectionLabel}>Способ оплаты</Text>
+              <View style={styles.segmentRow}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, lombardPrepayMethod === 'cash' && styles.segmentBtnCash]}
+                  onPress={() => setLombardPrepayMethod('cash')}
+                >
+                  <Banknote size={16} color={lombardPrepayMethod === 'cash' ? colors.white : colors.cash} />
+                  <Text style={[styles.segmentText, lombardPrepayMethod === 'cash' && styles.segmentTextWhite]}>Наличные</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, lombardPrepayMethod === 'card' && styles.segmentBtnCard]}
+                  onPress={() => setLombardPrepayMethod('card')}
+                >
+                  <CreditCard size={16} color={lombardPrepayMethod === 'card' ? colors.white : colors.card} />
+                  <Text style={[styles.segmentText, lombardPrepayMethod === 'card' && styles.segmentTextWhite]}>Безнал</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.lombardPrepayRow}>
+                <Text style={styles.customAmountLabel}>Сумма предоплаты:</Text>
+                <TextInput
+                  style={styles.customAmountInput}
+                  value={lombardPrepayAmount}
+                  onChangeText={setLombardPrepayAmount}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.textTertiary}
+                />
+              </View>
+            </View>
+          )}
+        </>
       )}
 
       {serviceType === 'onetime' && (
@@ -342,6 +397,11 @@ export default function CheckinModalScreen() {
             : inDebt ? `Долг: ${formatMoney(finalAmount)}` : formatMoney(finalAmount)
           }
         </Text>
+        {serviceType === 'lombard' && lombardPrepay && parseInt(lombardPrepayAmount) > 0 && (
+          <Text style={[styles.totalBase, { textDecorationLine: 'none' as const, color: colors.success, marginTop: 6 }]}>
+            Предоплата: {formatMoney(parseInt(lombardPrepayAmount))}
+          </Text>
+        )}
         {serviceType !== 'lombard' && customAmountEnabled && adjustmentDiff !== 0 && (
           <Text style={styles.totalBase}>Базовая: {formatMoney(baseAmount)}</Text>
         )}
@@ -418,6 +478,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     padding: 10, marginTop: 10, borderWidth: 1, borderColor: colors.warning + '20',
   },
   lombardInfoText: { flex: 1, fontSize: 12, color: colors.warning, fontWeight: '500' as const },
+  lombardPrepayForm: {
+    backgroundColor: colors.surface, borderRadius: 10,
+    padding: 12, marginTop: 8, borderWidth: 1, borderColor: colors.primary + '25', gap: 8,
+  },
+  lombardPrepayRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, marginTop: 4 },
   daysRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8,
   },

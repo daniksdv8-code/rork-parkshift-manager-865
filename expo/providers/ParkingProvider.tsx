@@ -355,6 +355,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     adjustmentReason?: string;
     baseAmount?: number;
     customRate?: number;
+    lombardPrepayment?: number;
   }) => {
     if (!currentUser) return null;
     if (!currentShift) {
@@ -514,6 +515,39 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
           id: generateId(), clientId: params.clientId,
           totalAmount: rate, frozenAmount: 0, activeAmount: rate, lastUpdate: now,
         });
+      }
+
+      if (params.lombardPrepayment && params.lombardPrepayment > 0 && params.paymentMethod) {
+        const prepayId = generateId();
+        newPayments.push({
+          id: prepayId, clientId: params.clientId, carId: params.carId, sessionId,
+          amount: roundMoney(params.lombardPrepayment), method: params.paymentMethod,
+          type: 'lombard',
+          description: 'Предоплата ломбарда',
+          operatorId: currentUser.id, operatorName: currentUser.name,
+          date: now, shiftId: currentShift?.id,
+        });
+        newTransactions.push({
+          id: generateId(), type: 'payment', amount: roundMoney(params.lombardPrepayment),
+          description: 'Предоплата ломбарда', method: params.paymentMethod,
+          clientId: params.clientId, carId: params.carId, sessionId,
+          operatorId: currentUser.id, operatorName: currentUser.name, date: now,
+          shiftId: currentShift?.id,
+        });
+        if (params.paymentMethod === 'cash' && currentShift) {
+          updatedShifts = updatedShifts.map(s =>
+            s.id === currentShift.id
+              ? { ...s, expectedCash: s.expectedCash + roundMoney(params.lombardPrepayment!) }
+              : s
+          );
+        }
+        if (params.paymentMethod === 'card') {
+          newAdminOps.push({
+            id: generateId(), type: 'card_income', amount: roundMoney(params.lombardPrepayment),
+            method: 'card', description: 'Безнал: предоплата ломбарда',
+            date: now, operatorId: currentUser.id, operatorName: currentUser.name,
+          });
+        }
       }
     }
 
