@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ChevronRight, ChevronDown, ChevronUp, Wallet, Car, Clock } from 'lucide-react-native';
+import { AlertTriangle, ChevronRight, ChevronDown, ChevronUp, Wallet, Car, Clock, Search, X } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
-import { formatMoney, formatDate, calculateDays } from '@/utils/helpers';
+import { formatMoney, formatDate, calculateDays, normalizeForSearch, normalizePhone } from '@/utils/helpers';
 import { calculateActiveSessionDebt } from '@/utils/financeCalculations';
 
 export default function DebtorsScreen() {
@@ -17,15 +17,29 @@ export default function DebtorsScreen() {
   } = useParking();
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const totalDebt = useMemo(() =>
     debtors.reduce((sum, d) => sum + d.amount, 0),
   [debtors]);
 
-  const sortedDebtors = useMemo(() =>
-    [...debtors].sort((a, b) => b.amount - a.amount),
-  [debtors]);
+  const sortedDebtors = useMemo(() => {
+    let filtered = [...debtors];
+    if (search.trim()) {
+      const q = normalizeForSearch(search);
+      const phoneQ = normalizePhone(search.trim());
+      filtered = filtered.filter(item => {
+        const cars = activeCars.filter(c => c.clientId === item.clientId);
+        const matchName = item.client ? normalizeForSearch(item.client.name).includes(q) : false;
+        const matchPhone = item.client ? normalizePhone(item.client.phone).includes(phoneQ) : false;
+        const matchPhone2 = item.client?.phone2 ? normalizePhone(item.client.phone2).includes(phoneQ) : false;
+        const matchPlate = cars.some(c => normalizeForSearch(c.plateNumber).includes(q));
+        return matchName || matchPhone || matchPhone2 || matchPlate;
+      });
+    }
+    return filtered.sort((a, b) => b.amount - a.amount);
+  }, [debtors, search, activeCars]);
 
   const getDebtBreakdown = (clientId: string) => {
     const clientActiveSessions = activeSessions.filter(s => s.clientId === clientId);
@@ -166,6 +180,21 @@ export default function DebtorsScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.searchBox}>
+        <Search size={18} color={colors.textTertiary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Номер авто, ФИО, телефон..."
+          placeholderTextColor={colors.textTertiary}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <X size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
       <View style={styles.summaryCard}>
         <Wallet size={20} color={colors.danger} />
         <View style={{ flex: 1 }}>
@@ -192,6 +221,16 @@ export default function DebtorsScreen() {
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surface, borderRadius: 12,
+    paddingHorizontal: 14, marginHorizontal: 16, marginTop: 12,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1, paddingVertical: 12, paddingLeft: 10,
+    fontSize: 15, color: colors.text,
+  },
   summaryCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: colors.dangerSurface, borderRadius: 14,

@@ -1,16 +1,16 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ArrowUpRight, ArrowDownRight, CreditCard, X, RotateCcw,
-  ChevronLeft, ChevronRight, Filter, Check, ChevronRight as ChevronRightSmall,
+  ChevronLeft, ChevronRight, Filter, Check, ChevronRight as ChevronRightSmall, Search,
 } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
-import { formatMoney, formatDateTime, getMethodLabel } from '@/utils/helpers';
+import { formatMoney, formatDateTime, getMethodLabel, normalizeForSearch, normalizePhone } from '@/utils/helpers';
 import { Transaction, TransactionType } from '@/types';
 
 type Period = 'day' | 'month' | 'year';
@@ -62,7 +62,7 @@ function getTransactionLabel(type: TransactionType): string {
 }
 
 export default function HistoryScreen() {
-  const { transactions, clients, cars } = useParking();
+  const { transactions, clients, cars, activeCars, activeClients } = useParking();
   const router = useRouter();
   const colors = useColors();
   const [period, setPeriod] = useState<Period>('day');
@@ -71,6 +71,7 @@ export default function HistoryScreen() {
   const [filterOperator, setFilterOperator] = useState<string>('all');
   const [filterMethod, setFilterMethod] = useState<'all' | 'cash' | 'card'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [search, setSearch] = useState('');
 
   const operators = useMemo(() => {
     const map = new Map<string, string>();
@@ -85,6 +86,20 @@ export default function HistoryScreen() {
     if (filterMethod !== 'all') count++;
     return count;
   }, [filterType, filterOperator, filterMethod]);
+
+  const allClientsMap = useMemo(() => {
+    const map = new Map<string, { name: string; phone?: string }>();
+    clients.forEach(c => map.set(c.id, { name: c.name, phone: c.phone }));
+    activeClients.forEach(c => { if (!map.has(c.id)) map.set(c.id, { name: c.name, phone: c.phone }); });
+    return map;
+  }, [clients, activeClients]);
+
+  const allCarsMap = useMemo(() => {
+    const map = new Map<string, { plateNumber: string; carModel?: string }>();
+    cars.forEach(c => map.set(c.id, { plateNumber: c.plateNumber, carModel: c.carModel }));
+    activeCars.forEach(c => { if (!map.has(c.id)) map.set(c.id, { plateNumber: c.plateNumber, carModel: c.carModel }); });
+    return map;
+  }, [cars, activeCars]);
 
   const filteredTx = useMemo(() => {
     const now = new Date();
@@ -110,9 +125,20 @@ export default function HistoryScreen() {
       if (filterOperator !== 'all' && t.operatorId !== filterOperator) return false;
       if (filterMethod !== 'all' && t.method !== filterMethod) return false;
 
+      if (search.trim()) {
+        const q = normalizeForSearch(search);
+        const phoneQ = normalizePhone(search.trim());
+        const car = t.carId ? allCarsMap.get(t.carId) : null;
+        const client = t.clientId ? allClientsMap.get(t.clientId) : null;
+        const matchPlate = car ? normalizeForSearch(car.plateNumber).includes(q) : false;
+        const matchName = client ? normalizeForSearch(client.name).includes(q) : false;
+        const matchPhone = client ? normalizePhone(client.phone ?? '').includes(phoneQ) : false;
+        if (!matchPlate && !matchName && !matchPhone) return false;
+      }
+
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, period, offset, filterType, filterOperator, filterMethod]);
+  }, [transactions, period, offset, filterType, filterOperator, filterMethod, search, allCarsMap, allClientsMap]);
 
   const summary = useMemo(() => {
     const income = filteredTx
@@ -125,18 +151,6 @@ export default function HistoryScreen() {
   }, [filteredTx]);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  const allClientsMap = useMemo(() => {
-    const map = new Map<string, { name: string }>();
-    clients.forEach(c => map.set(c.id, { name: c.name }));
-    return map;
-  }, [clients]);
-
-  const allCarsMap = useMemo(() => {
-    const map = new Map<string, { plateNumber: string; carModel?: string }>();
-    cars.forEach(c => map.set(c.id, { plateNumber: c.plateNumber, carModel: c.carModel }));
-    return map;
-  }, [cars]);
 
   const handleOpenClient = useCallback((clientId: string) => {
     router.push({ pathname: '/client-card', params: { clientId } });
@@ -213,6 +227,21 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.searchBox}>
+        <Search size={18} color={colors.textTertiary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Номер авто, ФИО, телефон..."
+          placeholderTextColor={colors.textTertiary}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <X size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
       <View style={styles.topBar}>
         <View style={styles.periodRow}>
           {(['day', 'month', 'year'] as Period[]).map(p => (
@@ -369,6 +398,16 @@ export default function HistoryScreen() {
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surface, borderRadius: 12,
+    paddingHorizontal: 14, marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1, paddingVertical: 12, paddingLeft: 10,
+    fontSize: 15, color: colors.text,
+  },
   topBar: { paddingBottom: 4 },
   periodRow: {
     flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8, alignItems: 'center',
