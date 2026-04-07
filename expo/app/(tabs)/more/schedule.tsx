@@ -412,20 +412,27 @@ export default function ScheduleScreen() {
             </Text>
 
             <Text style={styles.fieldLabel}>Оператор</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.operatorList}>
-              {allOperators.map(u => (
-                <TouchableOpacity
-                  key={u.id}
-                  style={[styles.operatorChip, selectedOperator === u.id && styles.operatorChipActive]}
-                  onPress={() => setSelectedOperator(u.id)}
-                >
-                  <View style={[styles.operatorDot, { backgroundColor: operatorColors.get(u.id) ?? colors.primary }]} />
-                  <Text style={[styles.operatorChipText, selectedOperator === u.id && styles.operatorChipTextActive]}>
-                    {u.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={styles.operatorListContainer}>
+              <ScrollView
+                style={styles.operatorList}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+              >
+                {allOperators.map(u => (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={[styles.operatorChip, selectedOperator === u.id && styles.operatorChipActive]}
+                    onPress={() => setSelectedOperator(u.id)}
+                  >
+                    <View style={[styles.operatorDot, { backgroundColor: operatorColors.get(u.id) ?? colors.primary }]} />
+                    <Text style={[styles.operatorChipText, selectedOperator === u.id && styles.operatorChipTextActive]} numberOfLines={1}>
+                      {u.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
 
             <View style={styles.timeRow}>
               <View style={styles.timeField}>
@@ -640,12 +647,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700' as const, color: colors.text },
   modalDate: { fontSize: 14, color: colors.primary, marginBottom: 16 },
   fieldLabel: { fontSize: 13, fontWeight: '600' as const, color: colors.textSecondary, marginBottom: 6 },
-  operatorList: { marginBottom: 16 },
+  operatorListContainer: {
+    maxHeight: 180,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceLight,
+    overflow: 'hidden' as const,
+  },
+  operatorList: { flexGrow: 0 },
   operatorChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.surfaceLight, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 8, marginRight: 8,
-    borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.surfaceLight, borderRadius: 0,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   operatorChipActive: { backgroundColor: colors.primarySurface, borderColor: colors.primary },
   operatorDot: { width: 8, height: 8, borderRadius: 4 },
