@@ -12,7 +12,7 @@ import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
 import { useParking } from '@/providers/ParkingProvider';
-import { formatMoney, formatPlateNumber, getServiceTypeLabel, getMonthlyAmount, normalizeForSearch, normalizePhone } from '@/utils/helpers';
+import { formatMoney, formatPlateNumber, getServiceTypeLabel, getMonthlyAmount, normalizeForSearch } from '@/utils/helpers';
 import { ServiceType, PaymentMethod, Car as CarType, Client } from '@/types';
 import { hapticSuccess, hapticError } from '@/utils/haptics';
 
@@ -45,37 +45,16 @@ export default function CheckinScreen() {
   const searchResults = useMemo(() => {
     if (plateSearch.trim().length < 1) return [];
     const q = normalizeForSearch(plateSearch);
-    console.log('[CheckinSearch] query normalized:', JSON.stringify(q), 'activeClients:', activeClients.length, 'activeCars:', activeCars.length);
-    const rawQ = plateSearch.trim();
+    console.log('[CheckinSearch] query normalized:', JSON.stringify(q), 'activeCars:', activeCars.length);
     const byPlate = activeCars.filter(c =>
       normalizeForSearch(c.plateNumber).includes(q)
-    );
-    const byClient = activeClients.filter(cl =>
-      normalizeForSearch(cl.name).includes(q) ||
-      normalizePhone(cl.phone).includes(normalizePhone(rawQ)) ||
-      (cl.phone2 && normalizePhone(cl.phone2).includes(normalizePhone(rawQ)))
     );
     const carResults = byPlate.map(car => ({
       car,
       client: activeClients.find(cl => cl.id === car.clientId),
       isParked: activeSessions.some(s => s.carId === car.id),
     }));
-    const clientCars = byClient.flatMap(cl =>
-      activeCars.filter(c => c.clientId === cl.id).map(car => ({
-        car,
-        client: cl,
-        isParked: activeSessions.some(s => s.carId === car.id),
-      }))
-    );
-    const seen = new Set(carResults.map(r => r.car.id));
-    const merged = [...carResults];
-    for (const cc of clientCars) {
-      if (!seen.has(cc.car.id)) {
-        merged.push(cc);
-        seen.add(cc.car.id);
-      }
-    }
-    return merged.slice(0, 10);
+    return carResults.slice(0, 10);
   }, [plateSearch, activeCars, activeClients, activeSessions]);
 
   const baseAmount = useMemo(() => {
@@ -206,14 +185,17 @@ export default function CheckinScreen() {
         <Search size={18} color={colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Номер авто, ФИО или телефон..."
+          placeholder="Введите номер авто..."
           placeholderTextColor={colors.textTertiary}
           value={plateSearch}
           onChangeText={(text) => {
             console.log('[CheckinSearch] input:', JSON.stringify(text), 'length:', text.length);
             setPlateSearch(text);
+            setSelectedCar(null);
+            setSelectedClient(null);
+            setShowNewClient(false);
           }}
-          autoCapitalize="none"
+          autoCapitalize="characters"
         />
         {plateSearch.length > 0 && !selectedCar && (
           <TouchableOpacity onPress={() => { setPlateSearch(''); setSelectedCar(null); setSelectedClient(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -262,21 +244,15 @@ export default function CheckinScreen() {
         </View>
       )}
 
-      {plateSearch.length >= 2 && searchResults.length === 0 && !selectedCar && (
+      {plateSearch.trim().length >= 2 && searchResults.length === 0 && !selectedCar && (
         <View style={styles.newClientOptions}>
+          <Text style={styles.noResultText}>Авто с номером "{plateSearch.trim()}" не найдено</Text>
           <TouchableOpacity
             style={styles.newClientBtn}
             onPress={() => setShowNewClient(true)}
           >
             <UserPlus size={18} color={colors.primary} />
-            <Text style={styles.newClientBtnText}>Создать и оформить заезд</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.newClientBtnAlt}
-            onPress={() => router.push('/add-client-modal')}
-          >
-            <UserPlus size={16} color={colors.textSecondary} />
-            <Text style={styles.newClientBtnAltText}>Добавить клиента без заезда</Text>
+            <Text style={styles.newClientBtnText}>Добавить нового клиента и оформить заезд</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -632,4 +608,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     padding: 16, alignItems: 'center', marginTop: 16,
   },
   checkInBtnText: { fontSize: 16, fontWeight: '700' as const, color: colors.white },
+  noResultText: { fontSize: 14, color: colors.textSecondary, marginBottom: 8 },
 });
