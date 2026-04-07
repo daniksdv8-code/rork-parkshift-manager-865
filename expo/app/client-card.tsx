@@ -590,11 +590,13 @@ export default function ClientCardScreen() {
                 </View>
               </View>
             ) : (
-              <>
-                <Car size={16} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.carPlate}>{car.plateNumber}</Text>
-                  {car.carModel && <Text style={styles.carModel}>{car.carModel}</Text>}
+              <View style={{ flex: 1 }}>
+                <View style={styles.carCardTopRow}>
+                  <Car size={16} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.carPlate} numberOfLines={1}>{car.plateNumber}</Text>
+                    {car.carModel && <Text style={styles.carModel} numberOfLines={1}>{car.carModel}</Text>}
+                  </View>
                   {clientSessions.some(s => s.carId === car.id) && (
                     <View style={styles.carParkedBadge}>
                       <ParkingCircle size={10} color={colors.primary} />
@@ -602,38 +604,40 @@ export default function ClientCardScreen() {
                     </View>
                   )}
                 </View>
-                {!clientSessions.some(s => s.carId === car.id) && !client.deleted && (
-                  <TouchableOpacity
-                    style={styles.carQuickCheckinBtn}
-                    onPress={() => {
-                      hapticMedium();
-                      router.push({ pathname: '/checkin-modal', params: { clientId, carId: car.id } });
-                    }}
-                  >
-                    <ParkingCircle size={12} color={colors.primary} />
-                    <Text style={styles.carQuickCheckinText}>Заезд</Text>
+                <View style={styles.carCardActions}>
+                  {!clientSessions.some(s => s.carId === car.id) && !client.deleted && (
+                    <TouchableOpacity
+                      style={styles.carQuickCheckinBtn}
+                      onPress={() => {
+                        hapticMedium();
+                        router.push({ pathname: '/checkin-modal', params: { clientId, carId: car.id } });
+                      }}
+                    >
+                      <ParkingCircle size={12} color={colors.primary} />
+                      <Text style={styles.carQuickCheckinText}>Заезд</Text>
+                    </TouchableOpacity>
+                  )}
+                  {clientSubs.find(s => s.carId === car.id) && (
+                    <TouchableOpacity
+                      style={styles.carPayBtn}
+                      onPress={() => router.push({
+                        pathname: '/pay-monthly-modal',
+                        params: { clientId, carId: car.id },
+                      })}
+                    >
+                      <Text style={styles.carPayText}>Оплата</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={() => startEditCar(car.id)} style={styles.carEditBtn}>
+                    <Edit3 size={14} color={colors.textSecondary} />
                   </TouchableOpacity>
-                )}
-                {clientSubs.find(s => s.carId === car.id) && (
-                  <TouchableOpacity
-                    style={styles.carPayBtn}
-                    onPress={() => router.push({
-                      pathname: '/pay-monthly-modal',
-                      params: { clientId, carId: car.id },
-                    })}
-                  >
-                    <Text style={styles.carPayText}>Оплата</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => startEditCar(car.id)} style={styles.carEditBtn}>
-                  <Edit3 size={14} color={colors.textSecondary} />
-                </TouchableOpacity>
-                {isAdmin && (
-                  <TouchableOpacity onPress={() => handleDeleteCar(car.id)} style={styles.carDeleteBtn}>
-                    <Trash2 size={14} color={colors.danger} />
-                  </TouchableOpacity>
-                )}
-              </>
+                  {isAdmin && (
+                    <TouchableOpacity onPress={() => handleDeleteCar(car.id)} style={styles.carDeleteBtn}>
+                      <Trash2 size={14} color={colors.danger} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
             )}
           </View>
         ))}
@@ -993,9 +997,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   restoreText: { fontSize: 12, fontWeight: '500' as const, color: colors.info },
   carCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: colors.surface, borderRadius: 10, padding: 12,
     marginBottom: 6, borderWidth: 1, borderColor: colors.border,
+  },
+  carCardTopRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+  },
+  carCardActions: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginTop: 8, paddingLeft: 26,
   },
   carPlate: { fontSize: 15, fontWeight: '700' as const, color: colors.text },
   carModel: { fontSize: 12, color: colors.textSecondary },
