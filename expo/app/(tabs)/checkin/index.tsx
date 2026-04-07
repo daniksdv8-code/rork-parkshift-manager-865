@@ -5,7 +5,7 @@ import {
 
 import {
   Search, Car, UserPlus, Banknote, CreditCard, FileEdit,
-  ChevronDown, ChevronUp, Check, AlertTriangle, LogOut as ExitIcon,
+  ChevronDown, ChevronUp, Check, AlertTriangle, LogOut as ExitIcon, X,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/providers/ThemeProvider';
@@ -216,6 +216,11 @@ export default function CheckinScreen() {
           }}
           autoCapitalize="none"
         />
+        {plateSearch.length > 0 && !selectedCar && (
+          <TouchableOpacity onPress={() => { setPlateSearch(''); setSelectedCar(null); setSelectedClient(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <X size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {searchResults.length > 0 && !selectedCar && (

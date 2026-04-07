@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Car, Clock, Search, ChevronRight } from 'lucide-react-native';
+import { Car, Clock, Search, ChevronRight, X } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
-import { formatDateTime, calculateDays, getServiceTypeLabel } from '@/utils/helpers';
+import { formatDateTime, calculateDays, getServiceTypeLabel, normalizeForSearch, normalizePhone } from '@/utils/helpers';
 import { ParkingSession } from '@/types';
 
 export default function ParkedNowScreen() {
@@ -17,15 +17,19 @@ export default function ParkedNowScreen() {
 
   const filtered = useMemo(() => {
     let list = activeSessions;
-    if (search.length >= 2) {
-      const q = search.toUpperCase();
+    if (search.trim()) {
+      const q = normalizeForSearch(search);
+      const rawQ = search.trim();
+      const phoneQ = normalizePhone(rawQ);
       list = list.filter(s => {
         const car = activeCars.find(c => c.id === s.carId);
         const client = activeClients.find(c => c.id === s.clientId);
         return (
-          car?.plateNumber.toUpperCase().includes(q) ||
-          car?.carModel?.toUpperCase().includes(q) ||
-          client?.name.toUpperCase().includes(q)
+          (car ? normalizeForSearch(car.plateNumber).includes(q) : false) ||
+          (car?.carModel ? normalizeForSearch(car.carModel).includes(q) : false) ||
+          (client ? normalizeForSearch(client.name).includes(q) : false) ||
+          (client ? normalizePhone(client.phone).includes(phoneQ) : false) ||
+          (client?.phone2 ? normalizePhone(client.phone2).includes(phoneQ) : false)
         );
       });
     }
@@ -76,11 +80,16 @@ export default function ParkedNowScreen() {
         <Search size={16} color={colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Поиск по номеру, модели, имени..."
+          placeholder="Номер авто, ФИО, телефон..."
           placeholderTextColor={colors.textTertiary}
           value={search}
           onChangeText={setSearch}
         />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <X size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.countCard}>

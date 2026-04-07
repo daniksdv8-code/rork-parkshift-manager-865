@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, UserPlus, Car, AlertTriangle } from 'lucide-react-native';
+import { Search, UserPlus, Car, AlertTriangle, X } from 'lucide-react-native';
 import { useColors } from '@/providers/ThemeProvider';
 import { ThemeColors } from '@/constants/colors';
 import { useParking } from '@/providers/ParkingProvider';
@@ -100,6 +100,11 @@ export default function ClientsScreen() {
             value={search}
             onChangeText={setSearch}
           />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
         </View>
         <TouchableOpacity
           style={styles.addBtn}

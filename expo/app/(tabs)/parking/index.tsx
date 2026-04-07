@@ -153,11 +153,16 @@ export default function ParkingScreen() {
         <Search size={18} color={colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Поиск по номеру, имени..."
+          placeholder="Номер авто, ФИО, телефон..."
           placeholderTextColor={colors.textTertiary}
           value={search}
           onChangeText={setSearch}
         />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <X size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.countBar}>
