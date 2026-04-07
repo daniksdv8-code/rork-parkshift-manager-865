@@ -91,12 +91,17 @@ export default function ClientCardScreen() {
     transactions.filter(t => t.clientId === clientId).slice(0, 20),
   [transactions, clientId]);
 
-  const recentPayments = useMemo(() =>
+  const [showAllPayments, setShowAllPayments] = useState(false);
+
+  const allClientPayments = useMemo(() =>
     payments
       .filter(p => p.clientId === clientId && !p.cancelled)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 10),
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
   [payments, clientId]);
+
+  const visiblePayments = useMemo(() =>
+    showAllPayments ? allClientPayments : allClientPayments.slice(0, 10),
+  [allClientPayments, showAllPayments]);
 
   const clientEditHistory = useMemo(() =>
     editHistory
@@ -665,11 +670,14 @@ export default function ClientCardScreen() {
         </View>
       )}
 
-      {isAdmin && recentPayments.length > 0 && (
+      {allClientPayments.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Оплаты</Text>
-          {recentPayments.map(p => (
+          <Text style={styles.sectionTitle}>История оплат</Text>
+          {visiblePayments.map(p => (
             <View key={p.id} style={styles.paymentRow}>
+              <View style={styles.paymentMethodBadge}>
+                <CreditCard size={12} color={p.method === 'card' ? colors.info : colors.success} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.paymentDesc} numberOfLines={1}>{p.description}</Text>
                 <Text style={styles.paymentMeta} numberOfLines={1}>
@@ -677,14 +685,27 @@ export default function ClientCardScreen() {
                 </Text>
               </View>
               <Text style={styles.paymentAmount}>+{formatMoney(p.amount)}</Text>
-              <TouchableOpacity
-                style={styles.cancelPayBtn}
-                onPress={() => handleCancelPayment(p.id, p.amount)}
-              >
-                <X size={12} color={colors.danger} />
-              </TouchableOpacity>
+              {isAdmin && (
+                <TouchableOpacity
+                  style={styles.cancelPayBtn}
+                  onPress={() => handleCancelPayment(p.id, p.amount)}
+                >
+                  <X size={12} color={colors.danger} />
+                </TouchableOpacity>
+              )}
             </View>
           ))}
+          {allClientPayments.length > 10 && (
+            <TouchableOpacity
+              style={styles.showAllPaymentsBtn}
+              onPress={() => setShowAllPayments(!showAllPayments)}
+            >
+              <Text style={styles.showAllPaymentsText}>
+                {showAllPayments ? 'Скрыть' : `Показать все (${allClientPayments.length})`}
+              </Text>
+              {showAllPayments ? <ChevronUp size={14} color={colors.primary} /> : <ChevronDown size={14} color={colors.primary} />}
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -921,15 +942,25 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   payAllDebtsText: { fontSize: 14, fontWeight: '600' as const, color: colors.white },
   paymentRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: colors.surface, borderRadius: 10, padding: 12,
+    marginBottom: 6, borderWidth: 1, borderColor: colors.border,
+  },
+  paymentMethodBadge: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.surfaceLight, alignItems: 'center', justifyContent: 'center',
   },
   paymentDesc: { fontSize: 13, color: colors.text },
   paymentMeta: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
-  paymentAmount: { fontSize: 14, fontWeight: '700' as const, color: colors.success, marginRight: 6 },
+  paymentAmount: { fontSize: 14, fontWeight: '700' as const, color: colors.success, marginLeft: 4 },
   cancelPayBtn: {
-    padding: 6, backgroundColor: colors.dangerSurface, borderRadius: 6,
+    padding: 6, backgroundColor: colors.dangerSurface, borderRadius: 6, marginLeft: 4,
   },
+  showAllPaymentsBtn: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    gap: 6, paddingVertical: 10, marginTop: 4,
+  },
+  showAllPaymentsText: { fontSize: 13, fontWeight: '600' as const, color: colors.primary },
   toggleHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4,
   },
