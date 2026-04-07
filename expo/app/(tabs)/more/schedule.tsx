@@ -215,6 +215,32 @@ export default function ScheduleScreen() {
     return map;
   }, [allOperators]);
 
+  const monthShiftCounts = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const counts = new Map<string, { name: string; total: number; color: string }>();
+
+    activeScheduledShifts.forEach(s => {
+      if (!s.date.startsWith(prefix)) return;
+      const existing = counts.get(s.operatorId);
+      const value = s.isSplitShift ? 0.5 : 1;
+      if (existing) {
+        existing.total += value;
+      } else {
+        counts.set(s.operatorId, {
+          name: s.operatorName,
+          total: value,
+          color: operatorColors.get(s.operatorId) ?? colors.primary,
+        });
+      }
+    });
+
+    return Array.from(counts.entries())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => b.total - a.total);
+  }, [activeScheduledShifts, currentMonth, operatorColors, colors.primary]);
+
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -235,6 +261,21 @@ export default function ScheduleScreen() {
           <Text key={d} style={styles.weekDay}>{d}</Text>
         ))}
       </View>
+
+      {monthShiftCounts.length > 0 && (
+        <View style={styles.summarySection}>
+          <Text style={styles.summaryTitle}>Смены за месяц</Text>
+          <View style={styles.summaryList}>
+            {monthShiftCounts.map(item => (
+              <View key={item.id} style={styles.summaryItem}>
+                <View style={[styles.summaryDot, { backgroundColor: item.color }]} />
+                <Text style={styles.summaryName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.summaryCount}>{item.total % 1 === 0 ? item.total : item.total.toFixed(1)}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
         <View style={styles.calendarGrid}>
@@ -461,6 +502,51 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   weekDay: {
     flex: 1, textAlign: 'center' as const, fontSize: 12,
     fontWeight: '600' as const, color: colors.textTertiary, paddingVertical: 6,
+  },
+  summarySection: {
+    backgroundColor: colors.surface,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  summaryTitle: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  summaryList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  summaryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  summaryName: {
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '500' as const,
+    maxWidth: 100,
+  },
+  summaryCount: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: colors.primary,
   },
   scrollArea: { flex: 1 },
   scrollContent: { paddingBottom: 32 },
