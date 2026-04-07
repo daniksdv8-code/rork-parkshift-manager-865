@@ -19,8 +19,13 @@ function RootLayoutNav() {
       screenOptions={{
         headerBackTitle: "Назад",
         headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
-        headerTitleStyle: { color: colors.text },
+        headerTintColor: colors.primary,
+        headerTitleStyle: {
+          color: colors.text,
+          fontSize: 17,
+          fontWeight: '700' as const,
+        },
+        headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}
     >

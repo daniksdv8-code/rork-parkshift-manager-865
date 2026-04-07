@@ -306,23 +306,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   themeSwitchDotLight: { backgroundColor: colors.white, alignSelf: 'flex-start' as const },
   section: { marginBottom: 24 },
   sectionTitle: {
-    fontSize: 13, fontWeight: '600' as const, color: colors.textTertiary,
-    textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 8,
+    fontSize: 12, fontWeight: '600' as const, color: colors.textTertiary,
+    textTransform: 'uppercase' as const, letterSpacing: 0.8, marginBottom: 10,
   },
   menuItem: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface, borderRadius: 12,
+    backgroundColor: colors.surface, borderRadius: 14,
     padding: 14, marginBottom: 6,
     borderWidth: 1, borderColor: colors.border,
   },
   iconWrap: {
-    width: 36, height: 36, borderRadius: 10,
+    width: 38, height: 38, borderRadius: 11,
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   menuLabel: { flex: 1, fontSize: 15, fontWeight: '500' as const, color: colors.text },
   badge: {
     borderRadius: 10,
-    minWidth: 20, paddingHorizontal: 6, paddingVertical: 2,
+    minWidth: 22, paddingHorizontal: 7, paddingVertical: 3,
     alignItems: 'center', marginRight: 8,
   },
   badgeText: { fontSize: 11, fontWeight: '700' as const, color: colors.white },

@@ -72,4 +72,46 @@ export const LightColors: ThemeColors = {
 
 export const Colors = DarkColors;
 
+export const Radius = {
+  xs: 6,
+  sm: 8,
+  md: 12,
+  lg: 14,
+  xl: 16,
+  xxl: 20,
+} as const;
+
+export const FontSize = {
+  xs: 11,
+  sm: 12,
+  md: 13,
+  base: 14,
+  lg: 15,
+  xl: 16,
+  '2xl': 18,
+  '3xl': 20,
+  '4xl': 24,
+  '5xl': 28,
+} as const;
+
+export const Spacing = {
+  xs: 4,
+  sm: 6,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  '2xl': 20,
+  '3xl': 24,
+  '4xl': 32,
+} as const;
+
+export const IconSize = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 18,
+  xl: 20,
+  '2xl': 24,
+} as const;
+
 export default Colors;

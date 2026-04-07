@@ -8,7 +8,14 @@ export default function MoreLayout() {
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
+        headerTintColor: colors.primary,
+        headerTitleStyle: {
+          color: colors.text,
+          fontSize: 17,
+          fontWeight: '700' as const,
+        },
+        headerShadowVisible: false,
+
         contentStyle: { backgroundColor: colors.background },
       }}
     >
