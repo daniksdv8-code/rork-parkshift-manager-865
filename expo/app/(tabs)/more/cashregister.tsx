@@ -172,7 +172,7 @@ export default function CashRegisterScreen() {
                   <Text style={styles.prevCashLabel}>Общая касса (с прошлой смены):</Text>
                 </View>
                 <Text style={styles.prevCashValue}>{formatMoney(previousCash)}</Text>
-                <Text style={styles.acceptInputLabel}>Принимаю в кассу, ₸</Text>
+                <Text style={styles.acceptInputLabel}>Принимаю в кассу, ₽</Text>
                 <TextInput
                   style={styles.formInput}
                   value={acceptedCashInput}

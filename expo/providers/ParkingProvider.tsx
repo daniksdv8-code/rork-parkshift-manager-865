@@ -971,7 +971,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
   const addExpense = useCallback((amount: number, category: string, description: string): { success: boolean; error?: string } => {
     if (!currentUser || !currentShift) return { success: false, error: 'Нет открытой смены' };
     if (roundMoney(amount) > currentShift.expectedCash) {
-      return { success: false, error: `Недостаточно средств в кассе. Доступно: ${currentShift.expectedCash.toFixed(0)} ₸` };
+      return { success: false, error: `Недостаточно средств в кассе. Доступно: ${currentShift.expectedCash.toFixed(0)} ₽` };
     }
     const now = new Date().toISOString();
     const expense: Expense = {
@@ -1126,7 +1126,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
   const withdrawCash = useCallback((amount: number, note?: string): { success: boolean; error?: string } => {
     if (!currentUser || !currentShift) return { success: false, error: 'Нет открытой смены' };
     if (roundMoney(amount) > currentShift.expectedCash) {
-      return { success: false, error: `Недостаточно средств в кассе. Доступно: ${currentShift.expectedCash.toFixed(0)} ₸` };
+      return { success: false, error: `Недостаточно средств в кассе. Доступно: ${currentShift.expectedCash.toFixed(0)} ₽` };
     }
     const now = new Date().toISOString();
     const withdrawal: CashWithdrawal = {
@@ -1450,7 +1450,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     const bal = method === 'cash' ? adminCashBalance.cash : adminCashBalance.card;
     if (roundMoney(amount) > bal) {
       const label = method === 'cash' ? 'наличных' : 'безналичных';
-      return { success: false, error: `Недостаточно ${label} средств. Доступно: ${bal.toFixed(0)} ₸` };
+      return { success: false, error: `Недостаточно ${label} средств. Доступно: ${bal.toFixed(0)} ₽` };
     }
     const now = new Date().toISOString();
     const advance: SalaryAdvance = {
@@ -1511,7 +1511,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     const bal = method === 'cash' ? adminCashBalance.cash : adminCashBalance.card;
     if (netPaid > bal) {
       const label = method === 'cash' ? 'наличных' : 'безналичных';
-      return { success: false, error: `Недостаточно ${label} средств для выплаты. На руки: ${netPaid.toFixed(0)} ₸, доступно: ${bal.toFixed(0)} ₸` };
+      return { success: false, error: `Недостаточно ${label} средств для выплаты. На руки: ${netPaid.toFixed(0)} ₽, доступно: ${bal.toFixed(0)} ₽` };
     }
     const payment: SalaryPayment = {
       id: generateId(),
@@ -1552,7 +1552,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     const bal = method === 'cash' ? adminCashBalance.cash : adminCashBalance.card;
     if (roundMoney(amount) > bal) {
       const label = method === 'cash' ? 'наличных' : 'безналичных';
-      return { success: false, error: `Недостаточно ${label} средств. Доступно: ${bal.toFixed(0)} ₸` };
+      return { success: false, error: `Недостаточно ${label} средств. Доступно: ${bal.toFixed(0)} ₽` };
     }
     const now = new Date().toISOString();
     const adminOp: AdminCashOperation = {
@@ -1588,7 +1588,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     if (!currentUser) return { success: false, error: 'Не авторизован' };
     const managerCash = currentShift?.expectedCash ?? 0;
     if (roundMoney(amount) > managerCash) {
-      return { success: false, error: `Недостаточно средств в кассе менеджера. Доступно: ${managerCash.toFixed(0)} ₸` };
+      return { success: false, error: `Недостаточно средств в кассе менеджера. Доступно: ${managerCash.toFixed(0)} ₽` };
     }
     const now = new Date().toISOString();
     const withdrawal: CashWithdrawal = {

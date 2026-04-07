@@ -89,7 +89,7 @@ export default function ShiftGuard({ children }: ShiftGuardProps) {
         <Text style={styles.previousCashValue}>{formatMoney(previousCash)}</Text>
 
         <View style={styles.inputWrap}>
-          <Text style={styles.inputLabel}>Принимаю в кассу, ₸</Text>
+          <Text style={styles.inputLabel}>Принимаю в кассу, ₽</Text>
           <TextInput
             style={styles.input}
             value={acceptedCash}
