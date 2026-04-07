@@ -2225,6 +2225,72 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     logAction('debt_delete', 'Долг удалён', '', debtId, 'debt');
   }, [currentUser, update, logAction]);
 
+  const adminForceCloseShift = useCallback((shiftId: string, actualCash: number, note?: string) => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    const now = new Date().toISOString();
+    const targetShift = data.shifts.find(s => s.id === shiftId && s.status === 'open');
+    if (!targetShift) return;
+
+    const shiftTransactions = data.transactions.filter(t => {
+      if (t.shiftId === targetShift.id) return true;
+      const tDate = new Date(t.date).getTime();
+      const openDate = new Date(targetShift.openedAt).getTime();
+      return tDate >= openDate && tDate <= Date.now();
+    });
+
+    const cashIncome = shiftTransactions
+      .filter(t => ['payment', 'debt_payment'].includes(t.type) && t.method === 'cash')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const cardIncome = shiftTransactions
+      .filter(t => ['payment', 'debt_payment'].includes(t.type) && t.method === 'card')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const cancelled = shiftTransactions
+      .filter(t => t.type === 'cancel_payment' && t.method === 'cash')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const refunded = shiftTransactions
+      .filter(t => t.type === 'refund' && t.method === 'cash')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = data.expenses
+      .filter(e => e.shiftId === targetShift.id)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const totalWithdrawals = data.withdrawals
+      .filter(w => w.shiftId === targetShift.id)
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    const startBalance = targetShift.acceptedCash ?? targetShift.carryOver;
+    const calculatedBalance = startBalance + cashIncome - cancelled - refunded - totalExpenses - totalWithdrawals;
+    const discrepancy = roundMoney(actualCash - calculatedBalance);
+
+    const closingSummary = {
+      cashIncome: roundMoney(cashIncome),
+      cardIncome: roundMoney(cardIncome),
+      totalExpenses: roundMoney(totalExpenses),
+      totalWithdrawals: roundMoney(totalWithdrawals),
+      calculatedBalance: roundMoney(calculatedBalance),
+      discrepancy,
+    };
+
+    update(prev => ({
+      ...prev,
+      shifts: prev.shifts.map(s =>
+        s.id === shiftId ? {
+          ...s,
+          status: 'closed' as const,
+          closedAt: now,
+          actualCash: roundMoney(actualCash),
+          expectedCash: roundMoney(calculatedBalance),
+          cashVariance: Math.abs(discrepancy),
+          cashVarianceType: discrepancy === 0 ? 'none' as const : discrepancy < 0 ? 'short' as const : 'over' as const,
+          closingSummary,
+          note: note ? `[Закрыта админом] ${note}` : '[Закрыта админом]',
+        } : s
+      ),
+    }));
+
+    logAction('admin_force_close_shift', 'Смена закрыта админом', `Менеджер: ${targetShift.operatorName}, Факт: ${actualCash}, Расхождение: ${discrepancy}`, shiftId, 'shift');
+    console.log(`[AdminForceCloseShift] Closed shift ${shiftId} of ${targetShift.operatorName}`);
+  }, [currentUser, data.shifts, data.transactions, data.expenses, data.withdrawals, update, logAction]);
+
   const addExpenseCategory = useCallback((name: string, type: ExpenseCategory['type']) => {
     const cat: ExpenseCategory = { id: generateId(), name, type };
     update(prev => ({ ...prev, expenseCategories: [...prev.expenseCategories, cat] }));
@@ -2407,6 +2473,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     getSessionNotes,
     getSessionAccrualTotal,
     createBackup,
+    adminForceCloseShift,
     applyHealing,
     restoreBackup,
     syncStatus,
@@ -2426,6 +2493,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     adminCashBalance, employeeSalaryDebts,
     addManualDebt, deleteDebt, addExpenseCategory, deleteExpenseCategory, activeExpenseCategories,
     logLogin, addSessionNote, getSessionNotes, getSessionAccrualTotal,
+    adminForceCloseShift,
     createBackup, restoreBackup, applyHealing,
   ]);
 });

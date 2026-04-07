@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import {
   Banknote, CreditCard, Car, AlertTriangle, Clock,
-  PlayCircle, LogOut, ChevronRight, Shield, Wallet,
+  PlayCircle, LogOut, ChevronRight, Shield, Wallet, StopCircle,
   Sparkles, Search, FileEdit, X, CheckCircle, RefreshCw,
   AlertCircle, UserPlus, ArrowRightLeft, TrendingUp,
 } from 'lucide-react-native';
@@ -35,7 +35,7 @@ export default function DashboardScreen() {
     getCurrentViolationMonth, getTodayCleaningShift,
     activeClients, activeCars,
     transactions, expenses, withdrawals,
-    syncStatus,
+    syncStatus, adminForceCloseShift,
   } = useParking();
   const colors = useColors();
 
@@ -45,6 +45,9 @@ export default function DashboardScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [shiftCashInput, setShiftCashInput] = useState('');
+  const [showAdminCloseModal, setShowAdminCloseModal] = useState(false);
+  const [adminCloseCash, setAdminCloseCash] = useState('');
+  const [adminCloseNote, setAdminCloseNote] = useState('');
 
 
   const fadeAnimsRef = useRef([0, 1, 2, 3].map(() => new Animated.Value(0)));
@@ -315,6 +318,12 @@ export default function DashboardScreen() {
           <View style={styles.shiftActiveTop}>
             <Shield size={16} color={colors.primary} />
             <Text style={styles.shiftActiveText} numberOfLines={1}>Смена открыта · {currentShift.operatorName}</Text>
+            {isAdmin && currentShift.operatorRole === 'manager' && (
+              <TouchableOpacity onPress={() => { setAdminCloseCash(String(Math.round(currentShift.expectedCash))); setAdminCloseNote(''); setShowAdminCloseModal(true); }} style={styles.adminCloseBtn}>
+                <StopCircle size={14} color={colors.danger} />
+                <Text style={styles.adminCloseText}>Закрыть</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={() => router.push('/cashregister-screen')}>
               <Text style={styles.shiftActiveLink}>Касса</Text>
             </TouchableOpacity>
@@ -448,6 +457,67 @@ export default function DashboardScreen() {
         <CleaningChecklist shiftId={getTodayCleaningShift.id} onClose={() => setShowChecklist(false)} />
       )}
 
+      <Modal visible={showAdminCloseModal} transparent animationType="fade">
+        <KeyboardAvoidingView style={styles.shiftModalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.shiftModalContent}>
+            <Text style={styles.shiftModalTitle}>Закрытие смены менеджера</Text>
+            <Text style={styles.shiftModalSub}>
+              Менеджер: {currentShift?.operatorName}
+            </Text>
+            <Text style={styles.shiftModalLabel}>Фактическая сумма в кассе:</Text>
+            <TextInput
+              style={styles.shiftModalInput}
+              value={adminCloseCash}
+              onChangeText={setAdminCloseCash}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={styles.shiftModalLabel}>Комментарий:</Text>
+            <TextInput
+              style={[styles.shiftModalInput, { fontSize: 14, fontWeight: '400' as const, textAlign: 'left' as const }]}
+              value={adminCloseNote}
+              onChangeText={setAdminCloseNote}
+              placeholder="Причина закрытия (необязательно)"
+              placeholderTextColor={colors.textTertiary}
+            />
+            <View style={styles.shiftModalBtns}>
+              <TouchableOpacity style={styles.shiftModalCancelBtn} onPress={() => setShowAdminCloseModal(false)}>
+                <Text style={styles.shiftModalCancelText}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.shiftModalConfirmBtn, { backgroundColor: colors.danger }]}
+                onPress={() => {
+                  if (!currentShift) return;
+                  const cash = parseFloat(adminCloseCash.replace(',', '.'));
+                  if (isNaN(cash) || cash < 0) {
+                    Alert.alert('Ошибка', 'Введите корректную сумму');
+                    return;
+                  }
+                  Alert.alert(
+                    'Закрыть смену?',
+                    `Смена менеджера ${currentShift.operatorName} будет принудительно закрыта.`,
+                    [
+                      { text: 'Отмена', style: 'cancel' },
+                      { text: 'Закрыть', style: 'destructive', onPress: () => {
+                        adminForceCloseShift(currentShift.id, cash, adminCloseNote || undefined);
+                        setShowAdminCloseModal(false);
+                        hapticSuccess();
+                        Alert.alert('Готово', 'Смена менеджера закрыта');
+                      }},
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.shiftModalConfirmText}>Закрыть смену</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <Modal visible={showShiftModal} transparent animationType="fade">
         <KeyboardAvoidingView style={styles.shiftModalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.shiftModalContent}>
@@ -515,6 +585,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   shiftActiveTop: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8 },
   shiftActiveText: { flex: 1, fontSize: 13, color: colors.primary, fontWeight: '500' as const },
   shiftActiveLink: { fontSize: 13, color: colors.primary, fontWeight: '600' as const },
+  adminCloseBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, backgroundColor: colors.danger + '15', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  adminCloseText: { fontSize: 12, fontWeight: '600' as const, color: colors.danger },
   shiftProgressTrack: { height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 10, overflow: 'hidden' as const },
   shiftProgressBar: { height: 4, backgroundColor: colors.primary, borderRadius: 2 },
   shiftProgressLabel: { fontSize: 11, color: colors.textTertiary, marginTop: 4 },

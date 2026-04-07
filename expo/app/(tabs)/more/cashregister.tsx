@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal,
 } from 'react-native';
 import {
   PlayCircle, StopCircle, Wallet, TrendingUp, TrendingDown,
@@ -16,11 +16,11 @@ import { AlertTriangle } from 'lucide-react-native';
 import { hapticSuccess, hapticMedium } from '@/utils/haptics';
 
 export default function CashRegisterScreen() {
-  const { currentUser, isManager } = useAuth();
+  const { currentUser, isManager, isAdmin } = useAuth();
   const colors = useColors();
   const {
     currentShift, shifts, openShift, closeShift, addExpense,
-    transactions, expenses, withdrawals,
+    transactions, expenses, withdrawals, adminForceCloseShift,
   } = useParking();
 
   const [actualCash, setActualCash] = useState('');
@@ -30,6 +30,9 @@ export default function CashRegisterScreen() {
   const [expenseDesc, setExpenseDesc] = useState('');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [acceptedCashInput, setAcceptedCashInput] = useState('');
+  const [showAdminCloseModal, setShowAdminCloseModal] = useState(false);
+  const [adminCloseCash, setAdminCloseCash] = useState('');
+  const [adminCloseNote, setAdminCloseNote] = useState('');
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const lastClosedShift = useMemo(() => {
@@ -41,6 +44,7 @@ export default function CashRegisterScreen() {
   const previousCash = lastClosedShift?.actualCash ?? 0;
 
   const isBlockedByOther = isManager && currentShift && currentUser && currentShift.operatorId !== currentUser.id;
+  const isAdminViewingManagerShift = isAdmin && currentShift && currentShift.operatorRole === 'manager';
 
   const handleOpenShift = useCallback(() => {
     hapticMedium();
@@ -203,6 +207,21 @@ export default function CashRegisterScreen() {
             </Text>
           </View>
 
+          {isAdminViewingManagerShift && (
+            <TouchableOpacity
+              style={styles.adminForceCloseBtn}
+              onPress={() => {
+                setAdminCloseCash(String(Math.round(expectedCash)));
+                setAdminCloseNote('');
+                setShowAdminCloseModal(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <StopCircle size={16} color={colors.danger} />
+              <Text style={styles.adminForceCloseText}>Закрыть смену менеджера (админ)</Text>
+            </TouchableOpacity>
+          )}
+
           {shiftStats && (
             <View style={styles.statsRow}>
               <View style={styles.statCard}>
@@ -305,6 +324,66 @@ export default function CashRegisterScreen() {
           </View>
         </>
       )}
+
+      <Modal visible={showAdminCloseModal} transparent animationType="fade">
+        <View style={styles.adminCloseOverlay}>
+          <View style={styles.adminCloseContent}>
+            <Text style={styles.adminCloseTitle}>Закрытие смены менеджера</Text>
+            <Text style={styles.adminCloseSub}>Менеджер: {currentShift?.operatorName}</Text>
+            <Text style={styles.adminCloseLabel}>Ожидаемая сумма: {formatMoney(expectedCash)}</Text>
+            <Text style={styles.adminCloseFieldLabel}>Фактическая сумма в кассе:</Text>
+            <TextInput
+              style={styles.adminCloseInput}
+              value={adminCloseCash}
+              onChangeText={setAdminCloseCash}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={styles.adminCloseFieldLabel}>Комментарий:</Text>
+            <TextInput
+              style={[styles.adminCloseInput, { fontSize: 14, fontWeight: '400' as const, textAlign: 'left' as const }]}
+              value={adminCloseNote}
+              onChangeText={setAdminCloseNote}
+              placeholder="Причина закрытия (необязательно)"
+              placeholderTextColor={colors.textTertiary}
+            />
+            <View style={styles.adminCloseBtns}>
+              <TouchableOpacity style={styles.adminCloseCancelBtn} onPress={() => setShowAdminCloseModal(false)}>
+                <Text style={styles.adminCloseCancelText}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.adminCloseConfirmBtn}
+                onPress={() => {
+                  if (!currentShift) return;
+                  const cash = parseFloat(adminCloseCash.replace(',', '.'));
+                  if (isNaN(cash) || cash < 0) {
+                    Alert.alert('Ошибка', 'Введите корректную сумму');
+                    return;
+                  }
+                  Alert.alert(
+                    'Закрыть смену?',
+                    `Смена менеджера ${currentShift.operatorName} будет принудительно закрыта.`,
+                    [
+                      { text: 'Отмена', style: 'cancel' },
+                      { text: 'Закрыть', style: 'destructive', onPress: () => {
+                        adminForceCloseShift(currentShift.id, cash, adminCloseNote || undefined);
+                        setShowAdminCloseModal(false);
+                        hapticSuccess();
+                        Alert.alert('Готово', 'Смена менеджера закрыта');
+                      }},
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.adminCloseConfirmText}>Закрыть смену</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {recentShifts.length > 0 && (
         <View style={styles.historySection}>
@@ -438,4 +517,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   shiftDate: { fontSize: 12, color: colors.textTertiary },
   shiftDetails: { gap: 2 },
   shiftDetail: { fontSize: 13, color: colors.textSecondary },
+  adminForceCloseBtn: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 8,
+    backgroundColor: colors.danger + '12', borderRadius: 12, padding: 14, marginBottom: 12,
+    borderWidth: 1, borderColor: colors.danger + '25',
+  },
+  adminForceCloseText: { fontSize: 14, fontWeight: '600' as const, color: colors.danger },
+  adminCloseOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' as const, alignItems: 'center' as const, padding: 24 },
+  adminCloseContent: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, width: '100%' as const, maxWidth: 340 },
+  adminCloseTitle: { fontSize: 18, fontWeight: '700' as const, color: colors.text, marginBottom: 4 },
+  adminCloseSub: { fontSize: 14, color: colors.danger, fontWeight: '500' as const, marginBottom: 12 },
+  adminCloseLabel: { fontSize: 13, color: colors.textSecondary, marginBottom: 12, backgroundColor: colors.primarySurface, padding: 10, borderRadius: 8, overflow: 'hidden' as const },
+  adminCloseFieldLabel: { fontSize: 13, fontWeight: '600' as const, color: colors.textSecondary, marginBottom: 6 },
+  adminCloseInput: { backgroundColor: colors.surfaceLight, borderRadius: 10, padding: 12, fontSize: 18, fontWeight: '700' as const, color: colors.text, borderWidth: 1, borderColor: colors.border, textAlign: 'center' as const, marginBottom: 12 },
+  adminCloseBtns: { flexDirection: 'row' as const, gap: 10 },
+  adminCloseCancelBtn: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center' as const, backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border },
+  adminCloseCancelText: { fontSize: 15, fontWeight: '600' as const, color: colors.textSecondary },
+  adminCloseConfirmBtn: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center' as const, backgroundColor: colors.danger },
+  adminCloseConfirmText: { fontSize: 15, fontWeight: '700' as const, color: colors.white },
 });
