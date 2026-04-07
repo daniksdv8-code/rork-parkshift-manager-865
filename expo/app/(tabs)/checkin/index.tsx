@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 
 import {
-  Search, Car, UserPlus, Banknote, CreditCard, FileEdit,
+  Car, UserPlus, Banknote, CreditCard, FileEdit,
   ChevronDown, ChevronUp, Check, AlertTriangle, LogOut as ExitIcon, X,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -181,25 +181,42 @@ export default function CheckinScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.searchBox}>
-        <Search size={18} color={colors.textTertiary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Введите номер авто..."
-          placeholderTextColor={colors.textTertiary}
-          value={plateSearch}
-          onChangeText={(text) => {
-            console.log('[CheckinSearch] input:', JSON.stringify(text), 'length:', text.length);
-            setPlateSearch(text);
-            setSelectedCar(null);
-            setSelectedClient(null);
-            setShowNewClient(false);
-          }}
-          autoCapitalize="characters"
-        />
+      <View style={styles.plateContainer}>
+        <View style={styles.plateFrame}>
+          <View style={styles.plateFlagStripe} />
+          <View style={styles.plateInputArea}>
+            <TextInput
+              style={styles.plateInput}
+              placeholder="А 000 АА"
+              placeholderTextColor={colors.textTertiary + '60'}
+              value={plateSearch}
+              onChangeText={(text) => {
+                console.log('[CheckinSearch] input:', JSON.stringify(text), 'length:', text.length);
+                setPlateSearch(text);
+                setSelectedCar(null);
+                setSelectedClient(null);
+                setShowNewClient(false);
+              }}
+              autoCapitalize="characters"
+              maxLength={20}
+            />
+          </View>
+          <View style={styles.plateRegion}>
+            <Text style={styles.plateRegionText}>RUS</Text>
+            <View style={styles.plateFlagMini}>
+              <View style={styles.plateFlagWhite} />
+              <View style={styles.plateFlagBlue} />
+              <View style={styles.plateFlagRed} />
+            </View>
+          </View>
+        </View>
         {plateSearch.length > 0 && !selectedCar && (
-          <TouchableOpacity onPress={() => { setPlateSearch(''); setSelectedCar(null); setSelectedClient(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <X size={18} color={colors.textTertiary} />
+          <TouchableOpacity
+            style={styles.plateClearBtn}
+            onPress={() => { setPlateSearch(''); setSelectedCar(null); setSelectedClient(null); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <X size={16} color={colors.textTertiary} />
           </TouchableOpacity>
         )}
       </View>
@@ -462,14 +479,86 @@ export default function CheckinScreen() {
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 40 },
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface, borderRadius: 12,
-    paddingHorizontal: 14, borderWidth: 1, borderColor: colors.border,
+  plateContainer: {
+    alignItems: 'center',
+    position: 'relative' as const,
   },
-  searchInput: {
-    flex: 1, paddingVertical: 14, paddingLeft: 10,
-    fontSize: 16, color: colors.text,
+  plateFrame: {
+    flexDirection: 'row' as const,
+    alignItems: 'stretch' as const,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#1A1A1A',
+    overflow: 'hidden' as const,
+    height: 56,
+    alignSelf: 'stretch' as const,
+  },
+  plateFlagStripe: {
+    width: 6,
+    backgroundColor: '#0039A6',
+  },
+  plateInputArea: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 12,
+  },
+  plateInput: {
+    fontSize: 24,
+    fontWeight: '800' as const,
+    color: '#1A1A1A',
+    letterSpacing: 3,
+    textAlign: 'center' as const,
+    padding: 0,
+  },
+  plateRegion: {
+    width: 50,
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#1A1A1A',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 4,
+  },
+  plateRegionText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: '#1A1A1A',
+    letterSpacing: 1,
+  },
+  plateFlagMini: {
+    flexDirection: 'row' as const,
+    width: 20,
+    height: 10,
+    borderRadius: 1,
+    overflow: 'hidden' as const,
+    marginTop: 3,
+  },
+  plateFlagWhite: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 0.5,
+    borderColor: '#DDD',
+  },
+  plateFlagBlue: {
+    flex: 1,
+    backgroundColor: '#0039A6',
+  },
+  plateFlagRed: {
+    flex: 1,
+    backgroundColor: '#D52B1E',
+  },
+  plateClearBtn: {
+    position: 'absolute' as const,
+    right: -4,
+    top: -8,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   resultsList: { marginTop: 8 },
   resultItem: {
