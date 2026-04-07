@@ -375,6 +375,16 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
 
     const isDiscounted = params.customRate !== undefined && params.baseAmount !== undefined && params.customRate < (params.baseAmount / (params.plannedDays ?? 1));
 
+    let debtDailyRate = tariffs.lombardRate;
+    if (params.inDebt && !isLombard) {
+      if (params.serviceType === 'onetime') {
+        const stdRate = params.paymentMethod === 'card' ? tariffs.onetimeCard : tariffs.onetimeCash;
+        debtDailyRate = (params.customRate !== undefined && params.customRate < stdRate) ? params.customRate : stdRate;
+      } else if (params.serviceType === 'monthly') {
+        debtDailyRate = params.paymentMethod === 'card' ? tariffs.monthlyCard : tariffs.monthlyCash;
+      }
+    }
+
     const session: ParkingSession = {
       id: sessionId,
       carId: params.carId,
@@ -382,11 +392,11 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       entryTime: now,
       exitTime: null,
       serviceType: params.serviceType,
-      status: isLombard ? 'active_debt' : 'active',
+      status: (isLombard || params.inDebt) ? 'active_debt' : 'active',
       prepaidAmount: params.inDebt ? 0 : (params.paymentAmount ?? 0),
       prepaidMethod: params.inDebt ? null : (params.paymentMethod ?? null),
       tariffType: params.tariffType ?? (isLombard ? 'lombard' : 'standard'),
-      lombardRateApplied: tariffs.lombardRate,
+      lombardRateApplied: (isLombard || params.inDebt) ? debtDailyRate : tariffs.lombardRate,
       managerId: currentUser.id,
       managerName: currentUser.name,
       shiftId: currentShift?.id ?? null,
@@ -465,19 +475,41 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       }
     }
 
-    if (params.inDebt && params.debtAmount && params.debtAmount > 0) {
+    if (params.inDebt && !isLombard) {
+      const rate = debtDailyRate;
+      newAccruals.push({
+        id: generateId(), parkingEntryId: sessionId,
+        clientId: params.clientId, carId: params.carId,
+        amount: rate, tariffRate: rate, accrualDate: now.split('T')[0],
+      });
+
       newDebts.push({
         id: generateId(), clientId: params.clientId, carId: params.carId,
-        parkingEntryId: sessionId, totalAmount: roundMoney(params.debtAmount),
-        remainingAmount: roundMoney(params.debtAmount), status: 'active',
-        description: 'Долг при заезде', createdAt: now,
+        parkingEntryId: sessionId, totalAmount: roundMoney(rate),
+        remainingAmount: roundMoney(rate), status: 'active',
+        description: 'Долг при заезде (начисление за 1-е сутки)', createdAt: now,
       });
       newTransactions.push({
-        id: generateId(), type: 'debt', amount: roundMoney(params.debtAmount),
-        description: 'Долг при заезде',
+        id: generateId(), type: 'debt', amount: roundMoney(rate),
+        description: 'Долг при заезде (начисление за 1-е сутки)',
         clientId: params.clientId, carId: params.carId, sessionId,
         operatorId: currentUser.id, operatorName: currentUser.name, date: now,
+        shiftId: currentShift?.id,
       });
+
+      const existingCd = updatedClientDebts.find(cd => cd.clientId === params.clientId);
+      if (existingCd) {
+        updatedClientDebts = updatedClientDebts.map(cd =>
+          cd.clientId === params.clientId
+            ? { ...cd, totalAmount: cd.totalAmount + rate, activeAmount: cd.activeAmount + rate, lastUpdate: now }
+            : cd
+        );
+      } else {
+        updatedClientDebts.push({
+          id: generateId(), clientId: params.clientId,
+          totalAmount: rate, frozenAmount: 0, activeAmount: rate, lastUpdate: now,
+        });
+      }
 
       if (params.serviceType === 'monthly' && params.paidUntilDate) {
         const existingSub = updatedSubscriptions.find(
@@ -494,6 +526,8 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
           });
         }
       }
+
+      console.log(`[CheckIn] Debt placement: serviceType=${params.serviceType}, dailyRate=${rate}, status=active_debt`);
     }
 
     if (isLombard) {
@@ -1948,7 +1982,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
               accrualDate: accrualDate.toISOString().split('T')[0],
             });
           }
-          console.log(`[DebtAccrual] Lombard session ${session.id}: elapsed=${elapsedDays}, existing=${existingCount}, new=${extraDays}, rate=${rate}`);
+          console.log(`[DebtAccrual] Debt session ${session.id} (${session.serviceType}): elapsed=${elapsedDays}, existing=${existingCount}, new=${extraDays}, rate=${rate}`);
         }
 
         const correctDebt = roundMoney(elapsedDays * rate);
