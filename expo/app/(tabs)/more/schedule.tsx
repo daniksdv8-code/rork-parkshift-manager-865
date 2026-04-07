@@ -14,9 +14,9 @@ import { useParking } from '@/providers/ParkingProvider';
 export default function ScheduleScreen() {
   const { currentUser, isAdmin } = useAuth();
   const colors = useColors();
-  const { activeScheduledShifts, users, addScheduledShift, updateScheduledShift, deleteScheduledShift, currentShift } = useParking();
+  const { activeScheduledShifts, users, addScheduledShift, updateScheduledShift, deleteScheduledShift } = useParking();
 
-  const canEditSchedule = isAdmin || (currentUser?.role === 'manager' && !currentShift);
+  const canEditSchedule = isAdmin || currentUser?.role === 'manager';
 
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [showAddModal, setShowAddModal] = useState(false);
