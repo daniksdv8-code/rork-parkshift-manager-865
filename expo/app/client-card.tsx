@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Phone, Car, CreditCard, Edit3, Plus, X, Check,
   Clock, Trash2, Wallet, RotateCcw, History,
-  LogOut as ExitIcon, ChevronDown, ChevronUp, ParkingCircle,
+  LogOut as ExitIcon, ChevronDown, ChevronUp, ParkingCircle, CalendarCheck,
 } from 'lucide-react-native';
 import { hapticMedium } from '@/utils/haptics';
 import { useColors } from '@/providers/ThemeProvider';
@@ -80,6 +80,16 @@ export default function ClientCardScreen() {
   const clientSubs = useMemo(() =>
     subscriptions.filter(s => s.clientId === clientId),
   [subscriptions, clientId]);
+
+  const activeSubscription = useMemo(() => {
+    const now = new Date();
+    return clientSubs.find(s => new Date(s.paidUntil) >= now) ?? null;
+  }, [clientSubs]);
+
+  const activeSubCar = useMemo(() => {
+    if (!activeSubscription) return null;
+    return clientCars.find(c => c.id === activeSubscription.carId) ?? null;
+  }, [activeSubscription, clientCars]);
 
   const clientDebts = useMemo(() =>
     activeDebts.filter(d => d.clientId === clientId),
@@ -291,6 +301,21 @@ export default function ClientCardScreen() {
           <Text style={styles.notes}>{client.notes}</Text>
         ) : null}
       </View>
+
+      {activeSubscription && (
+        <View style={styles.subscriptionBanner}>
+          <View style={styles.subscriptionBannerIcon}>
+            <CalendarCheck size={18} color={colors.success} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.subscriptionBannerTitle}>Абонемент активен</Text>
+            <Text style={styles.subscriptionBannerSub}>
+              до {formatDate(activeSubscription.paidUntil)} · осталось {daysUntil(activeSubscription.paidUntil)} дн.
+              {activeSubCar ? ` · ${activeSubCar.plateNumber}` : ''}
+            </Text>
+          </View>
+        </View>
+      )}
 
       <View style={[styles.debtBadge, totalDebt > 0 ? styles.debtBadgeRed : styles.debtBadgeGreen]}>
         <Text style={[styles.debtBadgeText, totalDebt > 0 ? styles.debtBadgeTextRed : styles.debtBadgeTextGreen]}>
@@ -996,4 +1021,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 5,
   },
   carQuickCheckinText: { fontSize: 11, fontWeight: '600' as const, color: colors.primary },
+  subscriptionBanner: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12,
+    backgroundColor: colors.successSurface, borderRadius: 12, padding: 14,
+    marginBottom: 12, borderWidth: 1, borderColor: colors.success + '30',
+  },
+  subscriptionBannerIcon: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.success + '20', alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
+  subscriptionBannerTitle: { fontSize: 14, fontWeight: '700' as const, color: colors.success },
+  subscriptionBannerSub: { fontSize: 12, color: colors.success, marginTop: 2, opacity: 0.85 },
 });
