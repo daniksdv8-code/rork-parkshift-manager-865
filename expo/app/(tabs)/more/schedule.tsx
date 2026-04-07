@@ -16,7 +16,7 @@ export default function ScheduleScreen() {
   const colors = useColors();
   const { activeScheduledShifts, users, addScheduledShift, updateScheduledShift, deleteScheduledShift, currentShift } = useParking();
 
-  const canEditSchedule = isAdmin || (currentUser?.role === 'manager' && currentShift && currentShift.operatorId === currentUser?.id);
+  const canEditSchedule = isAdmin || (currentUser?.role === 'manager' && !currentShift);
 
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [showAddModal, setShowAddModal] = useState(false);
@@ -98,7 +98,7 @@ export default function ScheduleScreen() {
 
   const openAddModal = useCallback((date: string) => {
     if (!canEditSchedule) {
-      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при открытой смене');
+      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при закрытой смене');
       return;
     }
     setSelectedDate(date);
@@ -127,7 +127,7 @@ export default function ScheduleScreen() {
 
   const openEditModal = useCallback((shift: typeof activeScheduledShifts[0]) => {
     if (!canEditSchedule) {
-      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при открытой смене');
+      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при закрытой смене');
       return;
     }
     setSelectedDate(shift.date);
@@ -197,7 +197,7 @@ export default function ScheduleScreen() {
 
   const handleDelete = useCallback((shiftId: string) => {
     if (!canEditSchedule) {
-      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при открытой смене');
+      Alert.alert('Нет доступа', 'Редактирование календаря доступно только при закрытой смене');
       return;
     }
     Alert.alert('Удалить смену', 'Удалить эту смену?', [
