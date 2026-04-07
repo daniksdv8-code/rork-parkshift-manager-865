@@ -211,7 +211,11 @@ export default function DashboardScreen() {
     hapticMedium();
     Alert.alert('Выход', 'Выйти из аккаунта?', [
       { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: () => { void logout(); router.replace('/login'); }},
+      { text: 'Выйти', style: 'destructive', onPress: async () => {
+        console.log('[Dashboard] Initiating logout');
+        await logout();
+        router.replace('/login');
+      }},
     ]);
   }, [logout, router]);
 

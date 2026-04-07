@@ -1,6 +1,6 @@
 import { Tabs, useRouter } from "expo-router";
 import { LayoutDashboard, CarFront, ParkingCircle, Users, Menu } from "lucide-react-native";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { useColors } from "@/providers/ThemeProvider";
 
@@ -8,11 +8,17 @@ export default function TabLayout() {
   const { currentUser, isLoading } = useAuth();
   const router = useRouter();
   const colors = useColors();
+  const isNavigating = useRef(false);
 
   useEffect(() => {
     if (isLoading) return;
-    if (!currentUser) {
-      router.replace('/login');
+    if (!currentUser && !isNavigating.current) {
+      isNavigating.current = true;
+      console.log('[TabLayout] No user, redirecting to login');
+      setTimeout(() => {
+        router.replace('/login');
+        setTimeout(() => { isNavigating.current = false; }, 500);
+      }, 50);
     }
   }, [currentUser, isLoading, router]);
 

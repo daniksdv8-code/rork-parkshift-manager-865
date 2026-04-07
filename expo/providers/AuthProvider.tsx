@@ -34,51 +34,70 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const login = useCallback(async (loginStr: string, password: string, users: User[]): Promise<{ success: boolean; error?: string }> => {
     const normalized = loginStr.trim().toLowerCase();
+    console.log('[Auth] Login attempt:', normalized, 'users available:', users.length);
 
-    if (normalized === 'admin' && password === 'admin') {
-      const adminUser = users.find(u => u.role === 'admin') ?? DEFAULT_ADMIN;
-      const userToSave = { ...adminUser };
-      setCurrentUser(userToSave);
-      await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(userToSave));
-      return { success: true };
-    }
-
-    const user = users.find(
-      u => u.login.toLowerCase() === normalized && !u.deleted && u.active
-    );
-
-    if (!user) {
-      return { success: false, error: 'Пользователь не найден или заблокирован' };
-    }
-
-    if (user.role === 'admin') {
-      if (password === 'admin' || password === user.login || (user.passwordHash && password === user.passwordHash)) {
-        setCurrentUser(user);
-        await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(user));
+    try {
+      if (normalized === 'admin' && password === 'admin') {
+        const adminUser = users.find(u => u.role === 'admin') ?? DEFAULT_ADMIN;
+        const userToSave = { ...adminUser };
+        setCurrentUser(userToSave);
+        try {
+          await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(userToSave));
+          console.log('[Auth] Admin session saved to storage');
+        } catch (e) {
+          console.log('[Auth] Failed to save admin session to storage:', e);
+        }
         return { success: true };
       }
-    } else {
-      if (user.passwordHash) {
-        if (password === user.passwordHash) {
-          setCurrentUser(user);
-          await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(user));
-          return { success: true };
-        }
+
+      const user = users.find(
+        u => u.login.toLowerCase() === normalized && !u.deleted && u.active
+      );
+
+      if (!user) {
+        console.log('[Auth] User not found or blocked:', normalized);
+        return { success: false, error: 'Пользователь не найден или заблокирован' };
+      }
+
+      let passwordValid = false;
+      if (user.role === 'admin') {
+        passwordValid = password === 'admin' || password === user.login || (!!user.passwordHash && password === user.passwordHash);
       } else {
-        if (password === user.login || password === '1234') {
-          setCurrentUser(user);
-          await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(user));
-          return { success: true };
+        if (user.passwordHash) {
+          passwordValid = password === user.passwordHash;
+        } else {
+          passwordValid = password === user.login || password === '1234';
         }
       }
-    }
 
-    return { success: false, error: 'Неверный пароль' };
+      if (passwordValid) {
+        setCurrentUser(user);
+        try {
+          await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(user));
+          console.log('[Auth] User session saved to storage:', user.name);
+        } catch (e) {
+          console.log('[Auth] Failed to save user session to storage:', e);
+        }
+        return { success: true };
+      }
+
+      console.log('[Auth] Invalid password for user:', normalized);
+      return { success: false, error: 'Неверный пароль' };
+    } catch (e) {
+      console.log('[Auth] Login error:', e);
+      return { success: false, error: 'Ошибка при входе. Попробуйте снова.' };
+    }
   }, []);
 
   const logout = useCallback(async () => {
+    console.log('[Auth] Logging out...');
     setCurrentUser(null);
-    await AsyncStorage.removeItem(AUTH_KEY);
+    try {
+      await AsyncStorage.removeItem(AUTH_KEY);
+      console.log('[Auth] Session removed from storage');
+    } catch (e) {
+      console.log('[Auth] Failed to remove session from storage:', e);
+    }
   }, []);
 
   const updateCurrentUser = useCallback(async (updates: Partial<User>) => {

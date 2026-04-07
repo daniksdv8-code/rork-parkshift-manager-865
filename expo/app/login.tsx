@@ -41,9 +41,11 @@ export default function LoginScreen() {
       return;
     }
     console.log('[Login] Attempting login, users count:', users.length, 'syncStatus:', syncStatus);
+    console.log('[Login] Available users:', users.map(u => ({ login: u.login, role: u.role, active: u.active, deleted: u.deleted })));
     setLoading(true);
     try {
       const result = await login(loginStr.trim(), password, users);
+      console.log('[Login] Result:', result.success ? 'SUCCESS' : 'FAILED', result.error ?? '');
       if (result.success) {
         const loggedUser = users.find(u => u.login.toLowerCase() === loginStr.trim().toLowerCase()) ?? users.find(u => u.role === 'admin');
         if (loggedUser) logLogin(loggedUser);
@@ -54,6 +56,9 @@ export default function LoginScreen() {
         shake();
         Alert.alert('Ошибка', result.error ?? 'Неверные данные');
       }
+    } catch (e) {
+      console.log('[Login] Unexpected error:', e);
+      Alert.alert('Ошибка', 'Произошла непредвиденная ошибка при входе');
     } finally {
       setLoading(false);
     }
