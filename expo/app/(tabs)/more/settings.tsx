@@ -104,20 +104,36 @@ export default function SettingsScreen() {
       let text = '';
 
       if (Platform.OS === 'web') {
-        if (asset.file) {
-          text = await asset.file.text();
+        if ((asset as any).file) {
+          text = await (asset as any).file.text();
         } else if (asset.uri) {
           const response = await fetch(asset.uri);
           text = await response.text();
         }
       } else {
-        const FileSystemLegacy = await import('expo-file-system/legacy');
-        text = await FileSystemLegacy.readAsStringAsync(asset.uri, {
-          encoding: FileSystemLegacy.EncodingType.UTF8,
-        });
+        try {
+          const { File: ExpoFile } = require('expo-file-system');
+          const file = new ExpoFile(asset.uri);
+          text = await file.text();
+          console.log('[Settings] Read via new File API, length:', text?.length);
+        } catch (fsError: any) {
+          console.log('[Settings] New File API failed, trying legacy:', fsError?.message);
+          try {
+            const FileSystemLegacy = require('expo-file-system/legacy');
+            text = await FileSystemLegacy.readAsStringAsync(asset.uri, {
+              encoding: FileSystemLegacy.EncodingType.UTF8,
+            });
+            console.log('[Settings] Read via legacy API, length:', text?.length);
+          } catch (legacyError: any) {
+            console.log('[Settings] Legacy API failed, trying fetch:', legacyError?.message);
+            const response = await fetch(asset.uri);
+            text = await response.text();
+            console.log('[Settings] Read via fetch, length:', text?.length);
+          }
+        }
       }
 
-      console.log('[Settings] Read text length:', text?.length);
+      console.log('[Settings] Final read text length:', text?.length);
 
       if (!text || text.length < 10) {
         Alert.alert('Ошибка', 'Файл пуст или содержит недопустимые данные');
