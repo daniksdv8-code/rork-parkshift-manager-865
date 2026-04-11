@@ -13,7 +13,7 @@ import { formatMoney, formatDateTime, formatDate, daysUntil, getServiceTypeLabel
 import BarChart from '@/components/BarChart';
 
 type Tab = 'revenue' | 'shifts' | 'auto' | 'operators' | 'debts' | 'expiring' | 'occupancy';
-type Period = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
+type Period = 'day' | 'week' | 'halfmonth' | 'month' | 'quarter' | 'year' | 'all';
 
 export default function ReportsScreen() {
   const router = useRouter();
@@ -34,6 +34,7 @@ export default function ReportsScreen() {
     switch (period) {
       case 'day': return d.toDateString() === now.toDateString();
       case 'week': return d.getTime() > now.getTime() - 7 * 86400000;
+      case 'halfmonth': return d.getTime() > now.getTime() - 15 * 86400000;
       case 'month': return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       case 'quarter': return d.getTime() > now.getTime() - 90 * 86400000;
       case 'year': return d.getFullYear() === now.getFullYear();
@@ -47,6 +48,7 @@ export default function ReportsScreen() {
     let daysCount = 7;
     if (period === 'month') daysCount = 30;
     else if (period === 'quarter') daysCount = 90;
+    else if (period === 'halfmonth') daysCount = 15;
     else if (period === 'week') daysCount = 7;
     else if (period === 'day') daysCount = 1;
     else if (period === 'year') daysCount = 12;
@@ -94,10 +96,35 @@ export default function ReportsScreen() {
     return Array.from(days.entries()).map(([label, data]) => ({ label, ...data }));
   }, [transactions, period]);
 
+  const shiftRevenueList = useMemo(() => {
+    const closedShifts = shifts.filter(s => s.status === 'closed' && s.closingSummary && s.closedAt && periodFilter(s.closedAt));
+    const list = closedShifts
+      .sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime())
+      .map(s => {
+        const ci = s.closingSummary?.cashIncome ?? 0;
+        const cdi = s.closingSummary?.cardIncome ?? 0;
+        const shiftSess = sessions.filter(sess => sess.shiftId === s.id);
+        return { id: s.id, operator: s.operatorName, openedAt: s.openedAt, closedAt: s.closedAt!, cash: ci, card: cdi, total: ci + cdi, cars: shiftSess.length, expenses: s.closingSummary?.totalExpenses ?? 0 };
+      });
+    const totalRev = list.reduce((s, d) => s + d.total, 0);
+    const totalCars = list.reduce((s, d) => s + d.cars, 0);
+    return { list, totalRev, totalCars, count: list.length };
+  }, [shifts, sessions, periodFilter]);
+
+  const carsPerPeriod = useMemo(() => {
+    const now = new Date();
+    const currentOnParking = sessions.filter(s => ['active', 'active_debt'].includes(s.status) && !s.cancelled && !s.exitTime).length;
+    const openShift = shifts.find(s => s.status === 'open');
+    const perShift = openShift ? sessions.filter(s => s.shiftId === openShift.id).length : 0;
+    const perHalfMonth = sessions.filter(s => new Date(s.entryTime).getTime() > now.getTime() - 15 * 86400000).length;
+    const perMonth = sessions.filter(s => { const d = new Date(s.entryTime); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
+    return { currentOnParking, perShift, perHalfMonth, perMonth };
+  }, [sessions, shifts]);
+
   const occupancyByDay = useMemo(() => {
     const now = new Date();
     const days = new Map<string, number>();
-    const daysCount = period === 'year' ? 12 : Math.min(period === 'month' ? 30 : period === 'quarter' ? 90 : 14, 14);
+    const daysCount = period === 'year' ? 12 : Math.min(period === 'month' ? 30 : period === 'halfmonth' ? 15 : period === 'quarter' ? 90 : 14, 14);
 
     if (period === 'year') {
       for (let i = 0; i < 12; i++) {
@@ -283,6 +310,7 @@ export default function ReportsScreen() {
   const periods: { key: Period; label: string }[] = [
     { key: 'day', label: 'День' },
     { key: 'week', label: 'Неделя' },
+    { key: 'halfmonth', label: '15 дн.' },
     { key: 'month', label: 'Месяц' },
     { key: 'quarter', label: 'Квартал' },
     { key: 'year', label: 'Год' },
@@ -395,6 +423,50 @@ export default function ReportsScreen() {
 
         {tab === 'shifts' && (
           <>
+            <View style={styles.carsPerPeriodCard}>
+              <Text style={styles.carsPerPeriodTitle}>Авто за период</Text>
+              <View style={styles.carsPerPeriodGrid}>
+                <View style={styles.carsPerPeriodItem}>
+                  <Text style={styles.carsPerPeriodValue}>{carsPerPeriod.currentOnParking}</Text>
+                  <Text style={styles.carsPerPeriodLabel}>Сейчас</Text>
+                </View>
+                <View style={styles.carsPerPeriodItem}>
+                  <Text style={styles.carsPerPeriodValue}>{carsPerPeriod.perShift}</Text>
+                  <Text style={styles.carsPerPeriodLabel}>За смену</Text>
+                </View>
+                <View style={styles.carsPerPeriodItem}>
+                  <Text style={styles.carsPerPeriodValue}>{carsPerPeriod.perHalfMonth}</Text>
+                  <Text style={styles.carsPerPeriodLabel}>15 дней</Text>
+                </View>
+                <View style={styles.carsPerPeriodItem}>
+                  <Text style={styles.carsPerPeriodValue}>{carsPerPeriod.perMonth}</Text>
+                  <Text style={styles.carsPerPeriodLabel}>Месяц</Text>
+                </View>
+              </View>
+            </View>
+
+            {shiftRevenueList.count > 0 && (
+              <View style={styles.shiftRevSummaryCard}>
+                <Text style={styles.shiftRevSummaryTitle}>Выручка по сменам</Text>
+                <View style={styles.shiftRevSummaryRow}>
+                  <Text style={styles.shiftRevSummaryLabel}>Всего за {shiftRevenueList.count} смен:</Text>
+                  <Text style={styles.shiftRevSummaryVal}>{formatMoney(shiftRevenueList.totalRev)}</Text>
+                </View>
+                <View style={styles.shiftRevSummaryRow}>
+                  <Text style={styles.shiftRevSummaryLabel}>Заездов:</Text>
+                  <Text style={styles.shiftRevSummaryVal}>{shiftRevenueList.totalCars}</Text>
+                </View>
+                {shiftRevenueList.count > 0 && (
+                  <View style={styles.shiftRevSummaryRow}>
+                    <Text style={styles.shiftRevSummaryLabel}>Средняя за смену:</Text>
+                    <Text style={[styles.shiftRevSummaryVal, { color: colors.primary }]}>
+                      {formatMoney(Math.round(shiftRevenueList.totalRev / shiftRevenueList.count))}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             <View style={styles.shiftSummary}>
               <Text style={styles.shiftSummaryText} numberOfLines={1}>Закрыто: {shiftStats.closed} · Открыто: {shiftStats.open}</Text>
               <View style={styles.shiftTotals}>
@@ -915,4 +987,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   snapshotCarType: { fontSize: 11, color: colors.textTertiary },
   snapshotCarDays: { fontSize: 13, fontWeight: '700' as const, color: colors.primary, marginTop: 1 },
   snapshotEmpty: { fontSize: 12, color: colors.textTertiary, textAlign: 'center' as const, paddingVertical: 8 },
+  carsPerPeriodCard: {
+    backgroundColor: colors.surface, borderRadius: 14, padding: 16,
+    marginBottom: 16, borderWidth: 1, borderColor: colors.border,
+  },
+  carsPerPeriodTitle: { fontSize: 15, fontWeight: '700' as const, color: colors.text, marginBottom: 12 },
+  carsPerPeriodGrid: { flexDirection: 'row', gap: 8 },
+  carsPerPeriodItem: {
+    flex: 1, backgroundColor: colors.surfaceLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+  },
+  carsPerPeriodValue: { fontSize: 20, fontWeight: '800' as const, color: colors.primary },
+  carsPerPeriodLabel: { fontSize: 10, color: colors.textTertiary, marginTop: 2 },
+  shiftRevSummaryCard: {
+    backgroundColor: colors.primarySurface, borderRadius: 14, padding: 16,
+    marginBottom: 16, borderWidth: 1, borderColor: colors.primary + '20', gap: 6,
+  },
+  shiftRevSummaryTitle: { fontSize: 15, fontWeight: '700' as const, color: colors.primary, marginBottom: 4 },
+  shiftRevSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  shiftRevSummaryLabel: { fontSize: 13, color: colors.textSecondary },
+  shiftRevSummaryVal: { fontSize: 15, fontWeight: '700' as const, color: colors.text },
 });

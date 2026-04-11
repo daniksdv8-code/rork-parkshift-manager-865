@@ -9,7 +9,7 @@ import { MAX_ACCRUAL_DAYS } from '@/constants/tariffs';
 import { initSupabaseTable, loadFromSupabase, saveToSupabase, subscribeToChanges } from '@/utils/supabase';
 import {
   Client, Car, ParkingSession, Payment, Transaction, Debt,
-  Tariffs, CashShift, Expense,
+  Tariffs, CashShift, Expense, ClientDebt, MonthlySubscription,
   CashWithdrawal, ActionLog, DailyDebtAccrual,
   AppData, ServiceType, PaymentMethod, User,
   SalaryAdvance, SalaryPayment, AdminCashOperation,
@@ -20,6 +20,54 @@ import {
 } from '@/types';
 
 const STORAGE_KEY = 'park_data';
+
+function recalculateAllClientDebts(
+  sessions: ParkingSession[],
+  debts: Debt[],
+  tariffs: Tariffs,
+  subscriptions: MonthlySubscription[],
+  nowStr: string,
+): ClientDebt[] {
+  const clientMap = new Map<string, number>();
+
+  const activeDebtSessions = sessions.filter(
+    s => ['active', 'active_debt'].includes(s.status) && !s.exitTime && !s.cancelled
+  );
+  const activeSessionIds = new Set(activeDebtSessions.map(s => s.id));
+
+  for (const session of activeDebtSessions) {
+    const sessionDebt = calculateActiveSessionDebt(session, tariffs, subscriptions, debts);
+    if (sessionDebt > 0) {
+      clientMap.set(session.clientId, (clientMap.get(session.clientId) ?? 0) + sessionDebt);
+    }
+  }
+
+  const standaloneDebts = debts.filter(
+    d => d.status === 'active' && d.remainingAmount > 0 && !activeSessionIds.has(d.parkingEntryId ?? '')
+  );
+  for (const debt of standaloneDebts) {
+    clientMap.set(debt.clientId, (clientMap.get(debt.clientId) ?? 0) + debt.remainingAmount);
+  }
+
+  return Array.from(clientMap.entries()).map(([clientId, total]) => ({
+    id: clientId,
+    clientId,
+    totalAmount: roundMoney(total),
+    frozenAmount: 0,
+    activeAmount: roundMoney(total),
+    lastUpdate: nowStr,
+  }));
+}
+
+function clientDebtsEqual(a: ClientDebt[], b: ClientDebt[]): boolean {
+  if (a.length !== b.length) return false;
+  const mapA = new Map(a.map(d => [d.clientId, d.totalAmount]));
+  for (const d of b) {
+    const aVal = mapA.get(d.clientId);
+    if (aVal === undefined || Math.abs(aVal - d.totalAmount) > 1) return false;
+  }
+  return true;
+}
 
 function createEmptyData(): AppData {
   return {
@@ -643,7 +691,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
     let updatedShifts = data.shifts;
     let updatedClientDebts = [...data.clientDebts];
 
-    if (session.serviceType === 'onetime') {
+    if (session.serviceType === 'onetime' && session.status !== 'active_debt') {
       const standardRate = session.prepaidMethod === 'card' ? tariffs.onetimeCard : tariffs.onetimeCash;
       const rate = (session.customRate !== undefined && session.isDiscounted) ? session.customRate : standardRate;
       const total = roundMoney(days * rate);
@@ -694,7 +742,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
         });
         newStatus = 'released_debt';
       }
-    } else if (session.serviceType === 'monthly') {
+    } else if (session.serviceType === 'monthly' && session.status !== 'active_debt') {
       const sub = data.subscriptions.find(
         s => s.clientId === session.clientId && s.carId === session.carId
       );
@@ -739,23 +787,21 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
         }
       }
     } else if (session.status === 'active_debt') {
-      const accruals = data.dailyDebtAccruals.filter(a => a.parkingEntryId === sessionId);
-      const accrualTotal = accruals.reduce((sum, a) => sum + a.amount, 0);
-      const cd = updatedClientDebts.find(cd => cd.clientId === session.clientId);
-      const actualDebt = Math.min(accrualTotal, cd?.totalAmount ?? accrualTotal);
+      const actualDebt = calculateActiveSessionDebt(session, tariffs, data.subscriptions, data.debts);
+      console.log(`[CheckOut] active_debt session ${sessionId}: dynamicDebt=${actualDebt}, days=${days}`);
 
       if (payment && payment.amount > 0) {
         const paid = Math.min(payment.amount, actualDebt);
         newPayments.push({
           id: generateId(), clientId: session.clientId, carId: session.carId, sessionId,
           amount: roundMoney(paid), method: payment.method, type: 'lombard',
-          description: `Оплата ломбарда (${days} сут.)`,
+          description: `Оплата долга (${days} сут.)`,
           operatorId: currentUser.id, operatorName: currentUser.name,
           date: now, shiftId: currentShift?.id,
         });
         newTransactions.push({
           id: generateId(), type: 'payment', amount: roundMoney(paid),
-          description: 'Оплата ломбарда', method: payment.method,
+          description: `Оплата долга (${days} сут.)`, method: payment.method,
           clientId: session.clientId, carId: session.carId,
           operatorId: currentUser.id, operatorName: currentUser.name, date: now,
         });
@@ -767,7 +813,7 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
         if (payment.method === 'card') {
           newAdminOps.push({
             id: generateId(), type: 'card_income', amount: roundMoney(paid),
-            method: 'card', description: 'Безнал при выезде (ломбард)',
+            method: 'card', description: 'Безнал при выезде (долг)',
             date: now, operatorId: currentUser.id, operatorName: currentUser.name,
           });
         }
@@ -777,24 +823,36 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
             id: generateId(), clientId: session.clientId, carId: session.carId,
             parkingEntryId: sessionId, totalAmount: roundMoney(afterPay),
             remainingAmount: roundMoney(afterPay), status: 'active',
-            description: 'Остаток долга ломбарда', createdAt: now,
+            description: `Остаток долга (${days} сут.)`, createdAt: now,
           });
           newStatus = 'released_debt';
         }
       } else {
-        newDebts.push({
-          id: generateId(), clientId: session.clientId, carId: session.carId,
-          parkingEntryId: sessionId, totalAmount: roundMoney(actualDebt),
-          remainingAmount: roundMoney(actualDebt), status: 'active',
-          description: 'Долг ломбарда при выезде', createdAt: now,
-        });
+        if (actualDebt > 0) {
+          newDebts.push({
+            id: generateId(), clientId: session.clientId, carId: session.carId,
+            parkingEntryId: sessionId, totalAmount: roundMoney(actualDebt),
+            remainingAmount: roundMoney(actualDebt), status: 'active',
+            description: `Долг при выезде (${days} сут.)`, createdAt: now,
+          });
+        }
         newStatus = 'released_debt';
       }
 
+      const oldSessionDebts = data.debts.filter(
+        d => d.parkingEntryId === sessionId && d.status === 'active'
+      );
+      const oldDebtTotal = oldSessionDebts.reduce((s, d) => s + d.remainingAmount, 0);
+      const cd = updatedClientDebts.find(c => c.clientId === session.clientId);
       if (cd) {
         updatedClientDebts = updatedClientDebts.map(c =>
           c.clientId === session.clientId
-            ? { ...c, totalAmount: Math.max(0, c.totalAmount - accrualTotal), activeAmount: Math.max(0, c.activeAmount - accrualTotal), lastUpdate: now }
+            ? {
+                ...c,
+                totalAmount: Math.max(0, c.totalAmount - oldDebtTotal),
+                activeAmount: Math.max(0, c.activeAmount - oldDebtTotal),
+                lastUpdate: now,
+              }
             : c
         );
       }
@@ -807,6 +865,10 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       operatorId: currentUser.id, operatorName: currentUser.name, date: now,
     });
 
+    const closedSessionDebts = session.status === 'active_debt'
+      ? data.debts.filter(d => d.parkingEntryId === sessionId && d.status === 'active').map(d => d.id)
+      : [];
+
     update(prev => ({
       ...prev,
       sessions: prev.sessions.map(s =>
@@ -814,13 +876,20 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
       ),
       transactions: [...newTransactions, ...prev.transactions],
       payments: [...newPayments, ...prev.payments],
-      debts: [...newDebts, ...prev.debts],
+      debts: [
+        ...newDebts,
+        ...prev.debts.map(d =>
+          closedSessionDebts.includes(d.id)
+            ? { ...d, remainingAmount: 0, status: 'paid' as const, updatedAt: now }
+            : d
+        ),
+      ],
       shifts: updatedShifts,
       clientDebts: updatedClientDebts,
       adminCashOperations: [...newAdminOps, ...prev.adminCashOperations],
     }));
 
-    logAction('checkout', 'Выезд', `${car?.plateNumber ?? ''}, статус: ${newStatus}`, sessionId, 'session');
+    logAction('checkout', 'Выезд', `${car?.plateNumber ?? ''}, статус: ${newStatus}, долг: ${session.status === 'active_debt' ? calculateActiveSessionDebt(session, tariffs, data.subscriptions, data.debts) : 0}`, sessionId, 'session');
     return { status: newStatus, days };
   }, [currentUser, data, currentShift, update, logAction]);
 
@@ -1952,8 +2021,8 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
   const runDebtAccrual = useCallback(() => {
     update(prev => {
       const now = new Date();
+      const nowStr = now.toISOString();
       const newAccruals: DailyDebtAccrual[] = [];
-      let updatedClientDebts = [...prev.clientDebts];
       let updatedDebts: Debt[] | null = null;
 
       const debtSessions = prev.sessions.filter(
@@ -1983,30 +2052,6 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
             });
           }
           console.log(`[DebtAccrual] Debt session ${session.id} (${session.serviceType}): elapsed=${elapsedDays}, existing=${existingCount}, new=${extraDays}, rate=${rate}`);
-        }
-
-        const correctDebt = roundMoney(elapsedDays * rate);
-        const cdIdx = updatedClientDebts.findIndex(cd => cd.clientId === session.clientId);
-        if (cdIdx >= 0) {
-          const oldSessionAccruals = (prev.dailyDebtAccruals.filter(a => a.parkingEntryId === session.id).length) * rate;
-          const diff = correctDebt - oldSessionAccruals;
-          if (Math.abs(diff) > 0) {
-            updatedClientDebts[cdIdx] = {
-              ...updatedClientDebts[cdIdx],
-              totalAmount: Math.max(0, updatedClientDebts[cdIdx].totalAmount + diff),
-              activeAmount: Math.max(0, updatedClientDebts[cdIdx].activeAmount + diff),
-              lastUpdate: now.toISOString(),
-            };
-          }
-        } else {
-          updatedClientDebts.push({
-            id: generateId(),
-            clientId: session.clientId,
-            totalAmount: correctDebt,
-            frozenAmount: 0,
-            activeAmount: correctDebt,
-            lastUpdate: now.toISOString(),
-          });
         }
       }
 
@@ -2048,39 +2093,36 @@ export const [ParkingProvider, useParking] = createContextHook(() => {
                 ...d,
                 totalAmount: roundMoney(d.totalAmount + accrualSum),
                 remainingAmount: roundMoney(d.remainingAmount + accrualSum),
-                updatedAt: now.toISOString(),
+                updatedAt: nowStr,
               }
             : d
         );
 
-        const cdIdx = updatedClientDebts.findIndex(cd => cd.clientId === debt.clientId);
-        if (cdIdx >= 0) {
-          updatedClientDebts[cdIdx] = {
-            ...updatedClientDebts[cdIdx],
-            totalAmount: updatedClientDebts[cdIdx].totalAmount + accrualSum,
-            activeAmount: updatedClientDebts[cdIdx].activeAmount + accrualSum,
-            lastUpdate: now.toISOString(),
-          };
-        } else {
-          updatedClientDebts.push({
-            id: generateId(),
-            clientId: debt.clientId,
-            totalAmount: accrualSum,
-            frozenAmount: 0,
-            activeAmount: accrualSum,
-            lastUpdate: now.toISOString(),
-          });
-        }
-
         console.log(`[DebtAccrual] Manual debt ${debt.id}: +${extraDays} days, +${accrualSum} (rate ${rate})`);
       }
 
-      if (newAccruals.length > 0 || updatedDebts) {
-        console.log(`[DebtAccrual] Added ${newAccruals.length} accruals`);
+      const finalDebts = updatedDebts ?? prev.debts;
+      const finalSessions = prev.sessions;
+
+      const recalcClientDebts = recalculateAllClientDebts(
+        finalSessions, finalDebts, prev.tariffs, prev.subscriptions, nowStr
+      );
+
+      const hasAccrualChanges = newAccruals.length > 0;
+      const hasDebtChanges = updatedDebts !== null;
+      const hasClientDebtChanges = !clientDebtsEqual(prev.clientDebts, recalcClientDebts);
+
+      if (hasAccrualChanges || hasDebtChanges || hasClientDebtChanges) {
+        if (hasAccrualChanges) {
+          console.log(`[DebtAccrual] Added ${newAccruals.length} accruals`);
+        }
+        if (hasClientDebtChanges) {
+          console.log(`[DebtAccrual] clientDebts recalculated`);
+        }
         return {
           ...prev,
           dailyDebtAccruals: [...prev.dailyDebtAccruals, ...newAccruals],
-          clientDebts: updatedClientDebts,
+          clientDebts: recalcClientDebts,
           ...(updatedDebts ? { debts: updatedDebts } : {}),
         };
       }
